@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mentor Dashboard | ILGC</title>
+<link rel="icon" type="image/png" href="frontend/images/plaksha-symbol-teal.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700;800&family=Merriweather:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="portal-shared.css">
+<link rel="stylesheet" href="faculty-dashboard.css">
+<link rel="stylesheet" href="ilgc-dashboard.css">
+</head>
+<body>
+
+<!-- ============ TOP NAV ============ -->
+<header class="topbar">
+  <div class="topbar-inner">
+
+    <button class="sidebar-toggle" id="sidebarToggle" aria-label="Show/hide sections" title="Show/hide sections">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+
+    <a href="index.html" class="brand">
+      <img src="frontend/images/plaksha-symbol-teal.png" alt="Plaksha University" class="brand-mark">
+      <span class="brand-name">Mentor Portal</span>
+    </a>
+
+    <div class="topbar-spacer"></div>
+
+    <div class="topbar-right">
+      <button class="icon-btn" id="notifBtn" data-tab="notifications" aria-label="Notifications" title="Notifications">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9"/></svg>
+        <span class="tab-badge hidden" id="notifBadge"></span>
+      </button>
+      <button class="logout-btn" id="logoutBtn">Log out</button>
+    </div>
+
+  </div>
+</header>
+
+<div class="app-shell">
+
+  <aside class="sidebar" id="sidebar">
+    <nav class="tabs" id="tabs">
+      <button class="tab" data-tab="home" data-active="true">Dashboard</button>
+      <button class="tab" data-tab="groups">My Groups</button>
+      <button class="tab" data-tab="interest">Student Interest</button>
+      <button class="tab" data-tab="proposals">Project Proposals</button>
+      <button class="tab" data-tab="reports">Group Reports</button>
+      <button class="tab" data-tab="profile">Profile</button>
+    </nav>
+  </aside>
+
+<main class="dashboard">
+
+  <!-- ============ DASHBOARD (HOME) ============ -->
+  <section class="view" id="view-home" data-active="true">
+
+    <div class="view-container">
+
+      <div class="greeting">
+        <h1 id="greetingText">Welcome back 👋</h1>
+        <p class="greeting-sub" id="greetingSub"></p>
+      </div>
+
+      <div class="stat-row stat-row-5" id="statRow"></div>
+
+      <div class="panel-row" style="margin-bottom:40px;">
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Needs Your Attention</h2>
+          </div>
+          <div id="pendingActionsList" class="pending-actions-list"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Recent Activity</h2>
+          </div>
+          <div id="activityFeed" class="activity-feed"></div>
+        </div>
+
+      </div>
+
+      <div class="panel-head" style="margin-bottom:18px;">
+        <h2 style="font-family:'Merriweather',serif;font-size:19px;color:#17313A;">My Groups</h2>
+        <button class="link-btn" data-goto="groups">Manage all →</button>
+      </div>
+
+      <div class="group-grid" id="homeGroupGrid"></div>
+
+    </div>
+
+  </section>
+
+  <!-- ============ MY GROUPS ============ -->
+  <section class="view" id="view-groups">
+
+    <div class="view-container">
+
+      <div class="view-heading-row">
+        <div class="view-heading">
+          <p class="eyebrow">GROUP MANAGEMENT</p>
+          <h1>My Groups</h1>
+          <p class="view-subtitle">Every active group across ILGC, with progress, membership, and the next milestone due.</p>
+        </div>
+        <button class="btn btn-primary" id="createProjectBtn">+ Create Project</button>
+      </div>
+
+      <div class="projects-filter-row" style="margin:28px 0 24px;">
+        <div class="status-chips" id="groupsStatusChips"></div>
+        <div class="year-filter">
+          <label for="groupsYearSelect">Year</label>
+          <select id="groupsYearSelect"></select>
+        </div>
+      </div>
+
+      <div class="group-grid" id="groupsGrid"></div>
+
+      <p id="groupsEmpty" class="empty-state hidden">No groups match this status.</p>
+
+    </div>
+
+  </section>
+
+  <!-- ============ STUDENT INTEREST ============ -->
+  <section class="view" id="view-interest">
+
+    <div class="view-container">
+
+      <div class="view-heading">
+        <p class="eyebrow">STUDENT INTEREST</p>
+        <h1>Student Interest</h1>
+        <p class="view-subtitle">Students who've expressed interest in a project, across every domain.</p>
+      </div>
+
+      <div class="students-table" id="interestTable"></div>
+
+      <p id="interestEmpty" class="empty-state hidden">
+        No students have expressed interest in any project yet.
+      </p>
+
+    </div>
+
+  </section>
+
+  <!-- ============ PROJECT PROPOSALS ============ -->
+  <section class="view" id="view-proposals">
+
+    <div class="view-container">
+
+      <div class="view-heading">
+        <p class="eyebrow">PROPOSAL REVIEW</p>
+        <h1>Project Proposals</h1>
+        <p class="view-subtitle">Student-proposed project ideas awaiting review, across every domain and faculty mentor.</p>
+      </div>
+
+      <div class="status-chips" id="proposalsStatusChips" style="margin:20px 0 12px;"></div>
+      <div class="filters-row" id="proposalsDomainFilter" style="margin-bottom:24px;"></div>
+
+      <div id="proposalsList" class="ideas-list"></div>
+
+      <p id="proposalsEmpty" class="empty-state hidden">No proposals match these filters.</p>
+
+    </div>
+
+  </section>
+
+  <!-- ============ GROUP REPORTS ============ -->
+  <section class="view" id="view-reports">
+
+    <div class="view-container">
+
+      <div class="view-heading-row">
+        <div class="view-heading">
+          <p class="eyebrow">REPORT REVIEW</p>
+          <h1>Group Reports</h1>
+          <p class="view-subtitle">Every report submitted across ILGC, from first submission through approval.</p>
+        </div>
+        <button class="btn btn-primary" id="addReportBtn">+ Add Report</button>
+      </div>
+
+      <div class="status-chips" id="reportsStatusChips" style="margin:28px 0 24px;"></div>
+
+      <div class="reports-table" id="reportsTable"></div>
+
+      <p id="reportsEmpty" class="empty-state hidden">No reports match this status.</p>
+
+    </div>
+
+  </section>
+
+  <!-- ============ NOTIFICATIONS ============ -->
+  <section class="view" id="view-notifications">
+
+    <div class="view-container narrow">
+
+      <div class="view-heading">
+        <p class="eyebrow">NOTIFICATION CENTER</p>
+        <h1>Notifications</h1>
+        <p class="view-subtitle">Everything happening across ILGC that might need your attention.</p>
+      </div>
+
+      <div id="notificationsList" class="notifications-list"></div>
+
+    </div>
+
+  </section>
+
+  <!-- ============ PROFILE ============ -->
+  <section class="view" id="view-profile">
+
+    <div class="view-container narrow">
+
+      <div class="view-heading">
+        <p class="eyebrow">YOUR ACCOUNT</p>
+        <h1>Profile</h1>
+      </div>
+
+      <div class="profile-card">
+        <div class="profile-avatar" id="profileAvatar"></div>
+        <div class="profile-info">
+          <h2 id="profileName"></h2>
+          <p id="profileMeta" class="profile-meta"></p>
+          <p class="profile-id"><span>User ID</span><span id="profileUserId"></span></p>
+        </div>
+      </div>
+
+      <div class="profile-actions" style="display:flex; gap:12px; flex-wrap:wrap;">
+        <button class="btn btn-secondary" id="editProfileBtn">Edit Profile</button>
+        <button class="logout-btn logout-btn-large" id="logoutBtnProfile">Log out</button>
+      </div>
+
+    </div>
+
+  </section>
+
+</main>
+
+</div>
+
+<!-- ============ DETAIL / FORM MODAL ============ -->
+<div id="modalOverlay" class="modal-overlay hidden">
+  <div class="modal-panel">
+    <button id="modalClose" aria-label="Close" class="modal-close">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </button>
+    <div id="modalBody" class="modal-body"></div>
+  </div>
+</div>
+
+<!-- ============ TOAST ============ -->
+<div id="toast" class="toast hidden"></div>
+
+<script src="data.js"></script>
+<script src="ilgc-dashboard.js"></script>
+</body>
+</html>

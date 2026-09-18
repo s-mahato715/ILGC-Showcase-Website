@@ -1,0 +1,472 @@
+/* ======================================================
+   STUDENT PORTAL — page-specific styles
+   Shared nav/panel/badge/modal/toast/profile primitives
+   live in portal-shared.css, loaded before this file.
+====================================================== */
+
+/* Mini interest rows on Home */
+
+.mini-interest-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid #EEF3F2;
+}
+
+.mini-interest-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.mini-interest-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #17313A;
+}
+
+.mini-interest-domain {
+    font-size: 12px;
+    color: #789096;
+}
+
+/* My project card (inside Home panel) */
+
+.my-project-card {
+    border: 1px solid #D7E5E3;
+    border-radius: 12px;
+    padding: 18px;
+}
+
+.my-project-title {
+    font-family: "Merriweather", serif;
+    font-weight: 700;
+    font-size: 17px;
+    color: #17313A;
+    margin-bottom: 6px;
+}
+
+.my-project-meta {
+    font-size: 13px;
+    color: #607278;
+    margin-bottom: 14px;
+}
+
+/* Discover controls */
+
+.discover-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: center;
+    margin: 30px 0 16px;
+}
+
+.search-input {
+    flex: 1;
+    min-width: 240px;
+    padding: 12px 16px;
+    border: 1px solid #D7E5E3;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #17313A;
+    background: #ffffff;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #007878;
+}
+
+/* My Interests list */
+
+.interests-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 28px;
+}
+
+.interest-row {
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 14px;
+    padding: 20px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.interest-row-main {
+    min-width: 0;
+}
+
+.interest-row-title {
+    font-family: "Merriweather", serif;
+    font-weight: 700;
+    font-size: 16px;
+    color: #17313A;
+    margin-bottom: 4px;
+    cursor: pointer;
+}
+
+.interest-row-title:hover {
+    color: #007878;
+}
+
+.interest-row-meta {
+    font-size: 13px;
+    color: #789096;
+}
+
+.interest-row-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.interest-date {
+    font-size: 12px;
+    color: #A2B2B6;
+    white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+    .interest-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .interest-row-right {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+
+/* =====================================================
+   MY PROJECTS TAB (full view + SharePoint)
+===================================================== */
+
+.mp-card {
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 18px;
+    padding: 30px 32px;
+    margin-bottom: 26px;
+}
+
+.mp-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.mp-title {
+    font-family: "Merriweather", serif;
+    font-weight: 700;
+    font-size: 24px;
+    color: #17313A;
+    margin-bottom: 10px;
+}
+
+.mp-summary {
+    font-size: 14px;
+    color: #4A6069;
+    line-height: 1.6;
+    margin-bottom: 22px;
+}
+
+.mp-meta-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 28px;
+    padding: 18px 0;
+    border-top: 1px solid #EAF1F0;
+    border-bottom: 1px solid #EAF1F0;
+    margin-bottom: 18px;
+}
+
+.mp-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.mp-block-title {
+    font-family: "Merriweather", serif;
+    font-weight: 700;
+    font-size: 15px;
+    color: #17313A;
+    margin-bottom: 12px;
+}
+
+.mp-block-sub {
+    font-size: 13px;
+    color: #607278;
+    line-height: 1.5;
+    margin-top: 2px;
+    max-width: 460px;
+}
+
+/* Milestones */
+
+.mp-milestones {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mp-milestone {
+    display: grid;
+    grid-template-columns: 18px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border: 1px solid #EAF1F0;
+    border-radius: 10px;
+    background: #FAFCFC;
+}
+
+.mp-milestone-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #C9DDDB;
+    background: #ffffff;
+}
+
+.mp-milestone-dot.done {
+    background: #007878;
+    border-color: #007878;
+}
+
+.mp-milestone-title {
+    font-size: 14px;
+    color: #33474F;
+    font-weight: 600;
+}
+
+.mp-milestone.done .mp-milestone-title {
+    color: #789096;
+}
+
+.mp-milestone-date {
+    font-size: 12px;
+    color: #789096;
+}
+
+/* SharePoint */
+
+.mp-sharepoint {
+    margin-top: 26px;
+    padding-top: 24px;
+    border-top: 1px solid #EAF1F0;
+}
+
+.mp-sharepoint-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.mp-file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.mp-file {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px 18px;
+    border: 1px solid #D7E5E3;
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+.mp-file-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: #17313A;
+    margin-bottom: 4px;
+}
+
+.mp-file-note {
+    font-size: 13px;
+    color: #4A6069;
+    line-height: 1.5;
+    margin-bottom: 6px;
+}
+
+.mp-file-meta {
+    font-size: 12px;
+    color: #789096;
+}
+
+.mp-file-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.mp-file-link {
+    font-size: 13px;
+    font-weight: 600;
+    color: #007878;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.mp-file-link:hover {
+    text-decoration: underline;
+}
+
+.btn-small {
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+}
+
+.mp-report-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 18px;
+    border: 1px dashed #C9DDDB;
+    border-radius: 12px;
+    background: #FAFCFC;
+}
+
+.mp-report-form input,
+.mp-report-form textarea {
+    padding: 11px 14px;
+    border: 1px solid #D7E5E3;
+    border-radius: 9px;
+    font-size: 13px;
+    font-family: inherit;
+    color: #17313A;
+    background: #ffffff;
+}
+
+.mp-report-form textarea {
+    min-height: 60px;
+    resize: vertical;
+}
+
+.mp-report-form input:focus,
+.mp-report-form textarea:focus {
+    outline: none;
+    border-color: #007878;
+}
+
+.mp-report-form .btn {
+    align-self: flex-start;
+}
+
+.mp-empty {
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 16px;
+    padding: 30px;
+}
+
+
+/* =====================================================
+   FLOAT AN IDEA + CONTACT PROFESSOR + HEADINGS
+===================================================== */
+
+.view-heading-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.contact-prof {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 14px 16px;
+    background: #F1F6F5;
+    border: 1px solid #D7E5E3;
+    border-radius: 12px;
+    margin-bottom: 4px;
+}
+
+.contact-prof-email {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #007878;
+}
+
+.float-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.float-label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #607278;
+}
+
+.float-form input,
+.float-form select,
+.float-form textarea {
+    padding: 11px 14px;
+    border: 1px solid #D7E5E3;
+    border-radius: 9px;
+    font-size: 14px;
+    font-family: inherit;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    color: #17313A;
+    background: #ffffff;
+}
+
+.float-form textarea {
+    min-height: 70px;
+    resize: vertical;
+}
+
+.float-form input:focus,
+.float-form select:focus,
+.float-form textarea:focus {
+    outline: none;
+    border-color: #007878;
+}
+
+
+/* "Yours" tag on the student's own floated ideas */
+.mine-tag {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #E4F6EE;
+    color: #1E7A52;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    vertical-align: middle;
+}

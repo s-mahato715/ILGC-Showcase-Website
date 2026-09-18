@@ -1,0 +1,1179 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Open Sans", Arial, sans-serif;
+    background: #F8FCFC;
+    color: #17313A;
+}
+
+button {
+    font-family: inherit;
+}
+
+/* =====================================================
+   TOP NAV
+===================================================== */
+
+.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: rgba(255,255,255,0.97);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid #D7E5E3;
+}
+
+.topbar-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 20px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.topbar-spacer {
+    flex: 1;
+}
+
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.sidebar-toggle {
+    border: 1px solid #D7E5E3;
+    background: #ffffff;
+    color: #17313A;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all .2s ease;
+}
+
+.sidebar-toggle:hover {
+    border-color: #007878;
+    color: #007878;
+    background: #EEF7F6;
+}
+
+.icon-btn {
+    position: relative;
+    border: 1px solid #D7E5E3;
+    background: #ffffff;
+    color: #17313A;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-size: 17px;
+    transition: all .2s ease;
+}
+
+.icon-btn:hover {
+    border-color: #007878;
+    color: #007878;
+    background: #EEF7F6;
+}
+
+.icon-btn[data-active="true"] {
+    background: #007878;
+    border-color: #007878;
+    color: #ffffff;
+}
+
+.icon-btn[data-active="true"] {
+    background: #007878;
+    border-color: #007878;
+    color: #ffffff;
+}
+
+.icon-btn .tab-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    margin-left: 0;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: #007878;
+    flex-shrink: 0;
+}
+
+.brand-mark {
+    height: 32px;
+    width: auto;
+    display: block;
+}
+
+.brand-name {
+    font-family: "Merriweather", serif;
+    font-weight: 700;
+    font-size: 17px;
+    color: #17313A;
+    white-space: nowrap;
+}
+
+/* =====================================================
+   APP SHELL / SIDEBAR NAV
+   Section tabs live in a collapsible left sidebar instead
+   of a horizontally-scrolling row up top. Toggle button in
+   the topbar hides/shows it; state is remembered per portal.
+===================================================== */
+
+.app-shell {
+    display: flex;
+    align-items: flex-start;
+}
+
+.sidebar {
+    width: 232px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 64px;
+    height: calc(100vh - 64px);
+    overflow-y: auto;
+    border-right: 1px solid #D7E5E3;
+    background: #ffffff;
+    padding: 20px 14px;
+    transition: width .18s ease, padding .18s ease, opacity .12s ease;
+}
+
+body.sidebar-collapsed .sidebar {
+    width: 0;
+    padding: 20px 0;
+    opacity: 0;
+    overflow: hidden;
+    border-right: none;
+}
+
+.tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tab {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: transparent;
+    padding: 11px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #607278;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .2s ease;
+}
+
+.tab:hover {
+    color: #007878;
+    background: #EEF7F6;
+}
+
+.tab[data-active="true"] {
+    background: #007878;
+    color: #ffffff;
+}
+
+.logout-btn {
+    border: 1px solid #D7E5E3;
+    background: #ffffff;
+    color: #17313A;
+    padding: 9px 18px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .2s ease;
+}
+
+.logout-btn:hover {
+    border-color: #C24E3A;
+    color: #C24E3A;
+}
+
+.logout-btn-large {
+    padding: 12px 22px;
+}
+
+/* =====================================================
+   LAYOUT / VIEWS
+===================================================== */
+
+.dashboard {
+    flex: 1;
+    min-width: 0;
+    min-height: calc(100vh - 64px);
+}
+
+.view {
+    display: none;
+    padding: 48px 0 80px;
+}
+
+.view[data-active="true"] {
+    display: block;
+}
+
+.view-container {
+    width: min(1160px, 90%);
+    margin: 0 auto;
+}
+
+.view-container.narrow {
+    width: min(640px, 90%);
+}
+
+.eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #BE9B49;
+    margin-bottom: 12px;
+}
+
+.view-heading h1 {
+    font-family: "Merriweather", serif;
+    font-size: clamp(30px, 4vw, 42px);
+    font-weight: 700;
+    color: #17313A;
+    letter-spacing: -1px;
+    margin-bottom: 10px;
+}
+
+.view-subtitle {
+    font-size: 15px;
+    color: #607278;
+    max-width: 560px;
+    line-height: 1.6;
+}
+
+.greeting h1 {
+    font-family: "Merriweather", serif;
+    font-size: clamp(28px, 4vw, 38px);
+    font-weight: 700;
+    color: #17313A;
+    margin-bottom: 6px;
+}
+
+.greeting-sub {
+    font-size: 14px;
+    color: #607278;
+    font-weight: 600;
+}
+
+/* =====================================================
+   STAT ROW
+===================================================== */
+
+.stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin: 32px 0 40px;
+}
+
+.stat-card {
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 14px;
+    padding: 22px 24px;
+}
+
+.stat-value {
+    font-family: "Merriweather", serif;
+    font-size: 34px;
+    font-weight: 700;
+    color: #007878;
+    line-height: 1;
+    margin-bottom: 8px;
+}
+
+.stat-label {
+    font-size: 13px;
+    color: #607278;
+    font-weight: 600;
+}
+
+/* =====================================================
+   PANELS
+===================================================== */
+
+.panel-row {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 24px;
+}
+
+.panel {
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 16px;
+    padding: 26px;
+}
+
+.panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    gap: 12px;
+}
+
+.panel-head h2 {
+    font-family: "Merriweather", serif;
+    font-size: 19px;
+    font-weight: 700;
+    color: #17313A;
+}
+
+.link-btn {
+    border: none;
+    background: none;
+    color: #007878;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.link-btn:hover {
+    text-decoration: underline;
+}
+
+.empty-panel {
+    font-size: 14px;
+    color: #789096;
+    line-height: 1.7;
+}
+
+.empty-panel a {
+    color: #007878;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.empty-panel a:hover {
+    text-decoration: underline;
+}
+
+/* =====================================================
+   PROGRESS BAR
+===================================================== */
+
+.progress-track {
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: #E6EFEE;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007878, #00A0B4);
+    border-radius: 999px;
+}
+
+.progress-label {
+    font-size: 12px;
+    color: #789096;
+    font-weight: 600;
+}
+
+/* =====================================================
+   STATUS BADGES
+===================================================== */
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.badge-pending {
+    background: #FDF3E1;
+    color: #9A6A0E;
+}
+
+.badge-accepted {
+    background: #E4F6EE;
+    color: #007878;
+}
+
+.badge-rejected {
+    background: #FBEBE8;
+    color: #B0473A;
+}
+
+.badge-ongoing {
+    background: #E4F6EE;
+    color: #007878;
+}
+
+.badge-proposed {
+    background: #EFF1FB;
+    color: #4A4FA8;
+}
+
+.badge-completed {
+    background: #EDEFF0;
+    color: #52636A;
+}
+
+/* =====================================================
+   CHIPS
+===================================================== */
+
+.status-chips,
+.domain-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.domain-chips {
+    margin-bottom: 28px;
+}
+
+.chip {
+    padding: 9px 16px;
+    border: 1px solid #C9DDDB;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #334D5A;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s ease;
+}
+
+.chip:hover {
+    border-color: #007878;
+    color: #007878;
+}
+
+.chip[data-active="true"] {
+    background: #007878;
+    color: #ffffff;
+    border-color: #007878;
+}
+
+/* =====================================================
+   BUTTONS
+===================================================== */
+
+.btn {
+    border: none;
+    border-radius: 999px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .2s ease;
+}
+
+.btn-primary {
+    background: #007878;
+    color: #ffffff;
+}
+
+.btn-primary:hover {
+    background: #0A5A55;
+}
+
+.btn-secondary {
+    background: #F1F6F5;
+    color: #334D5A;
+}
+
+.btn-secondary:hover {
+    background: #E4EDEC;
+}
+
+.btn-danger {
+    background: #FBEBE8;
+    color: #B0473A;
+}
+
+.btn-danger:hover {
+    background: #F6DAD5;
+}
+
+.btn[disabled] {
+    cursor: default;
+    opacity: 0.85;
+}
+
+.btn-pending {
+    background: #FDF3E1;
+    color: #9A6A0E;
+}
+
+.btn-accepted {
+    background: #E4F6EE;
+    color: #007878;
+}
+
+.btn-rejected {
+    background: #FBEBE8;
+    color: #B0473A;
+}
+
+/* =====================================================
+   PROJECT GRID / CARD
+   (discover-style cards, reused for "my projects" views)
+===================================================== */
+
+.project-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+
+.project-card {
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.project-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 15px 35px rgba(23,49,58,0.10);
+}
+
+.project-card-top {
+    padding: 20px 20px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.project-domain {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #007878;
+}
+
+.project-card-body {
+    padding: 14px 20px 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.project-title {
+    font-family: "Merriweather", serif;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.35;
+    color: #17313A;
+    margin-bottom: 10px;
+    cursor: pointer;
+}
+
+.project-title:hover {
+    color: #007878;
+}
+
+.project-description {
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: #607278;
+    margin-bottom: 16px;
+    flex: 1;
+}
+
+.project-mentor-row {
+    font-size: 13px;
+    color: #17313A;
+    font-weight: 700;
+    margin-bottom: 14px;
+}
+
+.project-card-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.project-card-actions .btn {
+    flex: 1;
+}
+
+.project-card-stats {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+
+.project-card-stat {
+    font-size: 12.5px;
+    color: #607278;
+}
+
+.project-card-stat strong {
+    color: #17313A;
+}
+
+/* =====================================================
+   EMPTY STATE
+===================================================== */
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    font-size: 14px;
+    color: #607278;
+}
+
+.result-count {
+    font-size: 13px;
+    font-weight: 700;
+    color: #007878;
+    margin-bottom: 18px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* =====================================================
+   PROFILE
+===================================================== */
+
+.profile-card {
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 16px;
+    padding: 28px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin: 28px 0 24px;
+}
+
+.profile-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #007878, #00A0B4);
+    color: #ffffff;
+    font-family: "Merriweather", serif;
+    font-size: 24px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.profile-info h2 {
+    font-family: "Merriweather", serif;
+    font-size: 20px;
+    color: #17313A;
+    margin-bottom: 4px;
+}
+
+.profile-meta {
+    font-size: 13px;
+    color: #607278;
+    margin-bottom: 10px;
+}
+
+.profile-id {
+    font-size: 13px;
+    color: #789096;
+    display: flex;
+    gap: 8px;
+}
+
+.profile-id span:first-child {
+    font-weight: 700;
+    color: #334D5A;
+}
+
+/* =====================================================
+   MODAL
+===================================================== */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(23,49,58,0.55);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 24px;
+    overflow-y: auto;
+}
+
+.modal-panel {
+    position: relative;
+    background: #ffffff;
+    width: 100%;
+    max-width: 640px;
+    border-radius: 18px;
+    margin-top: 40px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.25);
+}
+
+.modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: none;
+    background: #F1F6F5;
+    color: #007878;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.modal-close:hover {
+    background: #E4EDEC;
+}
+
+.modal-body {
+    padding: 32px;
+}
+
+.modal-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #007878;
+    margin-bottom: 10px;
+}
+
+.modal-title {
+    font-family: "Merriweather", serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: #17313A;
+    margin-bottom: 16px;
+    line-height: 1.25;
+}
+
+.modal-section-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #789096;
+    margin: 20px 0 8px;
+}
+
+.modal-section-label:first-of-type {
+    margin-top: 0;
+}
+
+.modal-text {
+    font-size: 14.5px;
+    line-height: 1.7;
+    color: #45575E;
+}
+
+.modal-team {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.team-chip {
+    background: #F1F6F5;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 12.5px;
+    color: #334D5A;
+    font-weight: 600;
+}
+
+.modal-meta-row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+
+.modal-meta-item {
+    font-size: 13px;
+}
+
+.modal-meta-item span {
+    display: block;
+}
+
+.modal-meta-item .meta-label {
+    color: #A2B2B6;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 3px;
+}
+
+.modal-meta-item .meta-value {
+    color: #17313A;
+    font-weight: 700;
+}
+
+.modal-actions {
+    margin-top: 26px;
+}
+
+.modal-field {
+    margin-bottom: 16px;
+}
+
+.modal-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #334D5A;
+    margin-bottom: 6px;
+}
+
+.modal-field input,
+.modal-field select,
+.modal-field textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #D7E5E3;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #17313A;
+    background: #ffffff;
+}
+
+.modal-field textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.field-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #607278;
+    line-height: 1.4;
+}
+
+.modal-field input:focus,
+.modal-field select:focus,
+.modal-field textarea:focus {
+    outline: none;
+    border-color: #007878;
+}
+
+/* =====================================================
+   TOAST
+===================================================== */
+
+.toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #17313A;
+    color: #ffffff;
+    padding: 14px 24px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 60;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.25);
+}
+
+/* =====================================================
+   RESPONSIVE
+===================================================== */
+
+@media (max-width: 900px) {
+    .panel-row {
+        grid-template-columns: 1fr;
+    }
+
+    .project-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .stat-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 900px) {
+    .sidebar {
+        position: fixed;
+        top: 64px;
+        left: 0;
+        z-index: 25;
+        width: 220px;
+        box-shadow: 8px 0 24px rgba(23,49,58,0.12);
+    }
+
+    body:not(.sidebar-collapsed) .sidebar {
+        width: 220px;
+    }
+
+    body.sidebar-collapsed .sidebar {
+        width: 0;
+    }
+}
+
+@media (max-width: 720px) {
+    .topbar-inner {
+        gap: 12px;
+    }
+
+    .brand {
+        flex-shrink: 1;
+        min-width: 0;
+    }
+
+    .brand-name {
+        font-size: 13px;
+        max-width: 40vw;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .tab {
+        padding: 9px 12px;
+        font-size: 13px;
+    }
+
+    .project-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* =====================================================
+   NOTIFICATIONS (shared across all portals)
+   Nav bell badge + the notifications list view. Originally
+   mentor-only; shared here so Faculty and Student portals
+   use the same styling.
+===================================================== */
+
+.tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    margin-left: 6px;
+    border-radius: 999px;
+    background: #C24E3A;
+    color: #ffffff;
+    font-size: 10.5px;
+    font-weight: 700;
+}
+
+.tab[data-active="true"] .tab-badge {
+    background: #ffffff;
+    color: #C24E3A;
+}
+
+.notifications-list {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.notification-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 14px;
+    padding: 16px 18px;
+    font-size: 13.5px;
+    color: #45575E;
+    line-height: 1.55;
+}
+
+.notification-icon {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #EEF7F6;
+    color: #007878;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+}
+
+.notification-text strong {
+    color: #17313A;
+}
+
+.notification-date {
+    display: block;
+    font-size: 11.5px;
+    color: #A2B2B6;
+    margin-top: 3px;
+}
+
+/* Origin badge — who floated a project (student / faculty / mentor) */
+.origin-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    background: #EEF3F2;
+    color: #45575E;
+}
+.origin-badge.origin-student { background: #E4F6EE; color: #1E7A52; }
+.origin-badge.origin-faculty { background: #E6EFEE; color: #005f5f; }
+.origin-badge.origin-mentor  { background: #EFF1FB; color: #3B4C9A; }
+
+
+/* Compact icon-only button (e.g. delete trash) */
+.btn-icon {
+    padding: 8px 12px;
+    font-size: 15px;
+    line-height: 1;
+    flex: 0 0 auto;
+}
+
+
+/* =====================================================
+   DISCOVER FILTER PANEL (shared)
+   A single card that groups the search + all filter rows
+   so the Discover view reads as one clean control block.
+===================================================== */
+
+.filter-panel {
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 16px;
+    padding: 20px 22px;
+    margin-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.filter-search {
+    width: 100%;
+    padding: 13px 16px;
+    border: 1px solid #D7E5E3;
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #17313A;
+    background: #F8FCFC;
+    box-sizing: border-box;
+}
+
+.filter-search:focus {
+    outline: none;
+    border-color: #007878;
+    background: #ffffff;
+}
+
+.filter-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.filter-group-label {
+    flex: 0 0 78px;
+    padding-top: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #789096;
+}
+
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex: 1 1 auto;
+}
+
+.filter-select-wrap {
+    flex: 1 1 auto;
+}
+
+.filter-select {
+    padding: 9px 14px;
+    border: 1px solid #C9DDDB;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #334D5A;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    min-width: 220px;
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: #007878;
+}
+
+@media (max-width: 620px) {
+    .filter-group-label { flex-basis: 100%; padding-top: 0; }
+}

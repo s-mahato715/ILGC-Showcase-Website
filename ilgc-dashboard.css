@@ -1,0 +1,239 @@
+/* ======================================================
+   ILGC MENTOR PORTAL — page-specific styles
+   Shared nav/panel/badge/modal/toast/profile primitives
+   live in portal-shared.css. Reports/ideas/students table
+   primitives are shared with the Faculty portal via
+   faculty-dashboard.css, loaded before this file.
+====================================================== */
+
+/* =====================================================
+   NAV NOTIFICATION BADGE
+===================================================== */
+
+.tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    margin-left: 6px;
+    border-radius: 999px;
+    background: #C24E3A;
+    color: #ffffff;
+    font-size: 10.5px;
+    font-weight: 700;
+}
+
+.tab[data-active="true"] .tab-badge {
+    background: #ffffff;
+    color: #C24E3A;
+}
+
+/* =====================================================
+   GROUP GRID (My Groups)
+===================================================== */
+
+.group-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+
+.group-card {
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.group-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 15px 35px rgba(23,49,58,0.10);
+}
+
+.group-card-top {
+    padding: 20px 20px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.group-card-body {
+    padding: 14px 20px 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.group-title {
+    font-family: "Merriweather", serif;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.35;
+    color: #17313A;
+    margin-bottom: 4px;
+    cursor: pointer;
+}
+
+.group-title:hover {
+    color: #007878;
+}
+
+.group-mentor {
+    font-size: 12.5px;
+    color: #607278;
+    margin-bottom: 12px;
+}
+
+.group-card-stats {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.group-card-stat {
+    font-size: 12.5px;
+    color: #607278;
+}
+
+.group-card-stat strong {
+    color: #17313A;
+}
+
+.group-next-milestone {
+    background: #F8FCFC;
+    border: 1px solid #E6EFEE;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+    color: #45575E;
+    margin-bottom: 14px;
+}
+
+.group-next-milestone strong {
+    display: block;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #789096;
+    margin-bottom: 3px;
+}
+
+@media (max-width: 1100px) {
+    .group-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .group-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =====================================================
+   GROUP DETAIL MODAL EXTRAS
+===================================================== */
+
+.milestone-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.milestone-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13.5px;
+    color: #45575E;
+}
+
+.milestone-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #E6EFEE;
+    flex-shrink: 0;
+}
+
+.milestone-dot.done {
+    background: #007878;
+}
+
+.milestone-item.done {
+    color: #17313A;
+    text-decoration: line-through;
+    text-decoration-color: #C9DDDB;
+}
+
+.milestone-date {
+    margin-left: auto;
+    font-size: 11.5px;
+    color: #A2B2B6;
+    flex-shrink: 0;
+}
+
+/* =====================================================
+   NOTIFICATIONS
+===================================================== */
+
+.notifications-list {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.notification-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 14px;
+    padding: 16px 18px;
+    font-size: 13.5px;
+    color: #45575E;
+    line-height: 1.55;
+}
+
+.notification-icon {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #EEF7F6;
+    color: #007878;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+}
+
+.notification-text strong {
+    color: #17313A;
+}
+
+.notification-date {
+    display: block;
+    font-size: 11.5px;
+    color: #A2B2B6;
+    margin-top: 3px;
+}
+
+/* =====================================================
+   ADD REPORT FORM (mentor-only)
+===================================================== */
+
+.report-detail-domain-note {
+    font-size: 12.5px;
+    color: #789096;
+    margin-bottom: 16px;
+}

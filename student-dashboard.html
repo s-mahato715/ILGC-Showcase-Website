@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Dashboard | ILGC</title>
+<link rel="icon" type="image/png" href="frontend/images/plaksha-symbol-teal.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700;800&family=Merriweather:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="portal-shared.css">
+<link rel="stylesheet" href="student-dashboard.css">
+</head>
+<body>
+
+<!-- ============ TOP NAV ============ -->
+<header class="topbar">
+  <div class="topbar-inner">
+
+    <button class="sidebar-toggle" id="sidebarToggle" aria-label="Show/hide sections" title="Show/hide sections">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+
+    <a href="index.html" class="brand">
+      <img src="frontend/images/plaksha-symbol-teal.png" alt="Plaksha University" class="brand-mark">
+      <span class="brand-name">ILGC Student Portal</span>
+    </a>
+
+    <div class="topbar-spacer"></div>
+
+    <div class="topbar-right">
+      <button class="icon-btn" id="notifBtn" data-tab="notifications" aria-label="Notifications" title="Notifications">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9"/></svg>
+        <span class="tab-badge hidden" id="notifBadge"></span>
+      </button>
+      <button class="logout-btn" id="logoutBtn">Log out</button>
+    </div>
+
+  </div>
+</header>
+
+<div class="app-shell">
+
+  <aside class="sidebar" id="sidebar">
+    <nav class="tabs" id="tabs">
+      <button class="tab" data-tab="home" data-active="true">Home</button>
+      <button class="tab" data-tab="myprojects">My Projects</button>
+      <button class="tab" data-tab="discover">Discover Projects</button>
+      <button class="tab" data-tab="myideas">Ideas</button>
+      <button class="tab" data-tab="interests">My Interests</button>
+      <button class="tab" data-tab="profile">Profile</button>
+    </nav>
+  </aside>
+
+<main class="dashboard">
+
+  <!-- ============ HOME ============ -->
+  <section class="view" id="view-home" data-active="true">
+
+    <div class="view-container">
+
+      <div class="greeting">
+        <h1 id="greetingText">Hi there 👋</h1>
+        <p id="greetingSub" class="greeting-sub"></p>
+      </div>
+
+      <div class="stat-row" id="statRow"></div>
+
+      <div class="panel-row">
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>My Project</h2>
+            <button class="link-btn" data-goto="myprojects">Open →</button>
+          </div>
+          <div id="myProjectPanel"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>My Interests</h2>
+            <button class="link-btn" data-goto="interests">View all →</button>
+          </div>
+          <div id="myInterestsPreview"></div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </section>
+
+  <!-- ============ MY PROJECTS ============ -->
+  <section class="view" id="view-myprojects">
+
+    <div class="view-container">
+
+      <div class="view-heading">
+        <p class="eyebrow">YOUR CURRENT ILGC PROJECT</p>
+        <h1>My Projects</h1>
+        <p class="view-subtitle">The project you've been accepted onto — your mentor, teammates, progress, and a shared SharePoint workspace for reports.</p>
+      </div>
+
+      <div id="myProjectsFull"></div>
+
+    </div>
+
+  </section>
+
+  <!-- ============ DISCOVER PROJECTS ============ -->
+  <section class="view" id="view-discover">
+
+    <div class="view-container">
+
+      <div class="view-heading view-heading-row">
+        <div>
+          <p class="eyebrow">FIND YOUR NEXT PROJECT</p>
+          <h1>Discover Projects</h1>
+          <p class="view-subtitle">Browse ongoing, proposed, and completed ILGC projects across every domain.</p>
+        </div>
+        <button class="btn btn-primary" id="floatIdeaBtn">💡 Float an Idea</button>
+      </div>
+
+      <div class="filter-panel">
+        <input type="text" id="discoverSearch" class="filter-search" placeholder="🔍  Search by title, domain, or professor...">
+
+        <div class="filter-group">
+          <span class="filter-group-label">Status</span>
+          <div class="chip-row" id="statusChips"></div>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-group-label">Domain</span>
+          <div class="chip-row" id="domainChips"></div>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-group-label">Professor</span>
+          <div class="filter-select-wrap">
+            <select id="discoverMentorSelect" class="filter-select"></select>
+          </div>
+        </div>
+      </div>
+
+      <p id="discoverCount" class="result-count"></p>
+
+      <div class="project-grid" id="discoverGrid"></div>
+
+      <p id="discoverEmpty" class="empty-state hidden">No projects match your filters.</p>
+
+    </div>
+
+  </section>
+
+  <!-- ============ MY INTERESTS ============ -->
+  <section class="view" id="view-interests">
+
+    <div class="view-container">
+
+      <div class="view-heading">
+        <p class="eyebrow">TRACK YOUR APPLICATIONS</p>
+        <h1>My Interests</h1>
+        <p class="view-subtitle">Every project you've expressed interest in, and where it stands.</p>
+      </div>
+
+      <div id="interestsList" class="interests-list"></div>
+
+      <p id="interestsEmpty" class="empty-state hidden">
+        You haven't expressed interest in any projects yet. Head to Discover Projects to find one.
+      </p>
+
+    </div>
+
+  </section>
+
+  <!-- ============ MY IDEAS ============ -->
+  <section class="view" id="view-myideas">
+
+    <div class="view-container">
+
+      <div class="view-heading view-heading-row">
+        <div>
+          <p class="eyebrow">STUDENT PROPOSALS</p>
+          <h1>Ideas</h1>
+          <p class="view-subtitle">Every idea floated by students across ILGC — including yours. Once a mentor reviews an idea, its status updates here.</p>
+        </div>
+        <button class="btn btn-primary" id="floatIdeaBtn2">💡 Float an Idea</button>
+      </div>
+
+      <div class="status-chips" id="ideasScopeChips" style="margin-bottom:22px;"></div>
+
+      <div id="myIdeasList" class="interests-list"></div>
+
+      <p id="myIdeasEmpty" class="empty-state hidden">
+        No ideas yet. Click "Float an Idea" to propose the first one.
+      </p>
+
+    </div>
+
+  </section>
+
+  <!-- ============ NOTIFICATIONS ============ -->
+  <section class="view" id="view-notifications">
+
+    <div class="view-container">
+
+      <div class="view-heading">
+        <p class="eyebrow">STAY UPDATED</p>
+        <h1>Notifications</h1>
+        <p class="view-subtitle">Updates on your interests, your ideas, and new projects across ILGC.</p>
+      </div>
+
+      <div id="notificationsList" class="notifications-list"></div>
+
+    </div>
+
+  </section>
+
+  <!-- ============ PROFILE ============ -->
+  <section class="view" id="view-profile">
+
+    <div class="view-container narrow">
+
+      <div class="view-heading">
+        <p class="eyebrow">YOUR ACCOUNT</p>
+        <h1>Profile</h1>
+      </div>
+
+      <div class="profile-card">
+        <div class="profile-avatar" id="profileAvatar"></div>
+        <div class="profile-info">
+          <h2 id="profileName"></h2>
+          <p id="profileMeta" class="profile-meta"></p>
+          <p class="profile-id"><span>User ID</span><span id="profileUserId"></span></p>
+        </div>
+      </div>
+
+      <button class="logout-btn logout-btn-large" id="logoutBtnProfile">Log out</button>
+
+    </div>
+
+  </section>
+
+</main>
+
+</div>
+
+<!-- ============ PROJECT DETAIL MODAL ============ -->
+<div id="modalOverlay" class="modal-overlay hidden">
+  <div class="modal-panel">
+    <button id="modalClose" aria-label="Close project details" class="modal-close">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </button>
+    <div id="modalBody" class="modal-body"></div>
+  </div>
+</div>
+
+<!-- ============ TOAST ============ -->
+<div id="toast" class="toast hidden"></div>
+
+<script src="data.js"></script>
+<script src="student-dashboard.js"></script>
+</body>
+</html>

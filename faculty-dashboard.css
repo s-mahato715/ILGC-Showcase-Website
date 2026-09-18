@@ -1,0 +1,769 @@
+/* ======================================================
+   FACULTY PORTAL — page-specific styles
+   Shared nav/panel/badge/modal/toast/profile primitives
+   live in portal-shared.css, loaded before this file.
+====================================================== */
+
+.view-heading-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+/* =====================================================
+   HOME — 5-UP STAT ROW / PENDING ACTIONS / ACTIVITY
+===================================================== */
+
+.stat-row-5 {
+    grid-template-columns: repeat(5, 1fr);
+}
+
+.pending-actions-list,
+.activity-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pending-action-item,
+.activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 0;
+    border-bottom: 1px solid #EEF3F2;
+    font-size: 13.5px;
+    color: #45575E;
+    line-height: 1.5;
+}
+
+.pending-action-item:last-child,
+.activity-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.pending-action-item:first-child,
+.activity-item:first-child {
+    padding-top: 0;
+}
+
+.pending-action-count {
+    flex-shrink: 0;
+    min-width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #FDF3E1;
+    color: #9A6A0E;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.activity-dot {
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    margin-top: 6px;
+    border-radius: 50%;
+    background: #007878;
+}
+
+.activity-date {
+    display: block;
+    font-size: 11.5px;
+    color: #A2B2B6;
+    margin-top: 2px;
+}
+
+@media (max-width: 1100px) {
+    .stat-row-5 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .stat-row-5 {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* =====================================================
+   STUDENT IDEAS
+===================================================== */
+
+.ideas-list {
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.idea-card {
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 16px;
+    padding: 22px 24px;
+}
+
+.idea-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.idea-title {
+    font-family: "Merriweather", serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: #17313A;
+    margin-bottom: 4px;
+}
+
+.idea-meta {
+    font-size: 12.5px;
+    color: #789096;
+}
+
+.idea-meta strong {
+    color: #334D5A;
+}
+
+.idea-section-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #A2B2B6;
+    margin: 12px 0 4px;
+}
+
+.idea-text {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #45575E;
+}
+
+.idea-tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.idea-tag {
+    background: #F1F6F5;
+    color: #334D5A;
+    border-radius: 999px;
+    padding: 4px 11px;
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+.idea-feedback-box {
+    margin-top: 12px;
+    background: #F8FCFC;
+    border: 1px solid #E6EFEE;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    color: #45575E;
+    line-height: 1.55;
+}
+
+.idea-feedback-box strong {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #789096;
+    margin-bottom: 4px;
+}
+
+.idea-card-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+
+/* =====================================================
+   PROJECT REPORTS
+===================================================== */
+
+.reports-table {
+    margin-top: 4px;
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.report-row {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr 0.9fr 1fr auto;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 22px;
+    border-bottom: 1px solid #EEF3F2;
+    cursor: pointer;
+    transition: background .15s ease;
+}
+
+.report-row:hover {
+    background: #F8FCFC;
+}
+
+.report-row:last-child {
+    border-bottom: none;
+}
+
+.report-row.head {
+    background: #F8FCFC;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #789096;
+    padding: 14px 22px;
+    cursor: default;
+}
+
+.report-row.head:hover {
+    background: #F8FCFC;
+}
+
+.report-project {
+    font-weight: 700;
+    color: #17313A;
+    font-size: 14px;
+}
+
+.report-cell {
+    font-size: 13.5px;
+    color: #45575E;
+}
+
+.badge-submitted { background: #EFF1FB; color: #4A4FA8; }
+.badge-underreview { background: #FDF3E1; color: #9A6A0E; }
+.badge-changesrequested { background: #FBEBE8; color: #B0473A; }
+.badge-resubmitted { background: #E7F1FE; color: #275C9E; }
+.badge-approved { background: #E4F6EE; color: #007878; }
+
+@media (max-width: 960px) {
+    .report-row {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+    .report-row.head {
+        display: none;
+    }
+}
+
+/* Report detail modal */
+
+.report-timeline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.report-timeline-step {
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: #EDEFF0;
+    color: #A2B2B6;
+}
+
+.report-timeline-step.done {
+    background: #E4F6EE;
+    color: #007878;
+}
+
+.report-comment {
+    background: #F8FCFC;
+    border: 1px solid #E6EFEE;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+}
+
+.report-comment-author {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #17313A;
+}
+
+.report-comment-date {
+    font-size: 11px;
+    color: #A2B2B6;
+    margin-left: 6px;
+    font-weight: 400;
+}
+
+.report-comment-text {
+    font-size: 13px;
+    color: #45575E;
+    margin-top: 4px;
+    line-height: 1.55;
+}
+
+/* =====================================================
+   UNMANAGED STUDENTS
+===================================================== */
+
+.filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.filters-row select {
+    padding: 9px 14px;
+    border: 1px solid #C9DDDB;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #334D5A;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.unmanaged-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.unmanaged-card {
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 16px;
+    padding: 22px;
+}
+
+.unmanaged-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
+.unmanaged-name {
+    font-family: "Merriweather", serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #17313A;
+}
+
+.unmanaged-dept {
+    font-size: 12.5px;
+    color: #607278;
+    margin-bottom: 12px;
+}
+
+.unmanaged-field-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #A2B2B6;
+    margin-bottom: 5px;
+    margin-top: 10px;
+}
+
+.unmanaged-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.unmanaged-chip {
+    background: #F1F6F5;
+    color: #334D5A;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+.unmanaged-card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+}
+
+.unmanaged-card-actions .btn {
+    flex: 1;
+    white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+    .unmanaged-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =====================================================
+   PROJECT TAGS
+===================================================== */
+
+.tag-form {
+    display: flex;
+    gap: 10px;
+    margin: 24px 0 24px;
+}
+
+.tag-form input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid #D7E5E3;
+    border-radius: 999px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #17313A;
+}
+
+.tag-form input:focus {
+    outline: none;
+    border-color: #007878;
+}
+
+.tag-manage-list {
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.tag-manage-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 16px 20px;
+    border-bottom: 1px solid #EEF3F2;
+}
+
+.tag-manage-row:last-child {
+    border-bottom: none;
+}
+
+.tag-manage-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #17313A;
+}
+
+.tag-manage-count {
+    font-size: 12px;
+    color: #789096;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.tag-manage-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.tag-manage-actions .btn {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.tag-edit-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #007878;
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-family: inherit;
+    color: #17313A;
+    margin-right: 10px;
+}
+
+/* Tag picker inside the project form modal */
+
+.tag-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.tag-picker-option {
+    padding: 7px 14px;
+    border: 1px solid #C9DDDB;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #334D5A;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s ease;
+}
+
+.tag-picker-option[data-active="true"] {
+    background: #007878;
+    color: #ffffff;
+    border-color: #007878;
+}
+
+/* =====================================================
+   INTERESTED STUDENTS TABLE
+===================================================== */
+
+.students-table {
+    margin-top: 28px;
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.student-row {
+    display: grid;
+    grid-template-columns: 1.2fr 0.7fr 1.3fr 1.5fr 0.9fr auto;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 22px;
+    border-bottom: 1px solid #EEF3F2;
+}
+
+.student-row:last-child {
+    border-bottom: none;
+}
+
+.student-row.head {
+    background: #F8FCFC;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #789096;
+    padding: 14px 22px;
+}
+
+.student-name {
+    font-weight: 700;
+    color: #17313A;
+    font-size: 14px;
+}
+
+.student-cell {
+    font-size: 13.5px;
+    color: #45575E;
+}
+
+.student-project-of-interest {
+    font-size: 13.5px;
+    color: #17313A;
+    font-weight: 600;
+}
+
+.student-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.student-actions .btn {
+    padding: 7px 13px;
+    font-size: 12px;
+}
+
+@media (max-width: 900px) {
+    .student-row {
+        grid-template-columns: 1fr;
+        gap: 6px;
+        padding: 18px 20px;
+    }
+
+    .student-row.head {
+        display: none;
+    }
+
+    .student-actions {
+        margin-top: 8px;
+    }
+}
+
+/* =====================================================
+   TEAMS
+===================================================== */
+
+.teams-list {
+    margin-top: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.team-card {
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 16px;
+    padding: 24px;
+}
+
+.team-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+
+.team-card-title {
+    font-family: "Merriweather", serif;
+    font-weight: 700;
+    font-size: 18px;
+    color: #17313A;
+}
+
+.team-semester-group {
+    margin-bottom: 14px;
+}
+
+.team-semester-group:last-child {
+    margin-bottom: 0;
+}
+
+.team-semester-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #A2B2B6;
+    margin-bottom: 8px;
+}
+
+.team-member-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.team-empty {
+    font-size: 13.5px;
+    color: #789096;
+}
+
+
+/* =====================================================
+   MY PROJECTS — STATUS + YEAR FILTER ROW
+===================================================== */
+
+.projects-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.year-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.year-filter label {
+    font-size: 13px;
+    font-weight: 700;
+    color: #607278;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.year-filter select {
+    padding: 9px 14px;
+    border: 1px solid #C9DDDB;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #334D5A;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.year-filter select:focus {
+    outline: none;
+    border-color: #007878;
+}
+
+
+/* =====================================================
+   SHAREPOINT — READ-ONLY VIEW (faculty / mentor modal)
+===================================================== */
+
+.sp-view-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.sp-view-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px 16px;
+    border: 1px solid #D7E5E3;
+    border-radius: 12px;
+    background: #FAFCFC;
+}
+
+.sp-view-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: #17313A;
+    margin-bottom: 4px;
+}
+
+.sp-view-note {
+    font-size: 13px;
+    color: #4A6069;
+    line-height: 1.5;
+    margin-bottom: 6px;
+}
+
+.sp-view-meta {
+    font-size: 12px;
+    color: #789096;
+}
+
+.sp-view-link {
+    font-size: 13px;
+    font-weight: 600;
+    color: #007878;
+    text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.sp-view-link:hover {
+    text-decoration: underline;
+}
+
+.sp-view-nolink {
+    font-size: 12px;
+    color: #A6B4B8;
+    white-space: nowrap;
+    flex-shrink: 0;
+}

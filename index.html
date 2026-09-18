@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ILGC Project Showcase</title>
+<link rel="icon" type="image/png" href="frontend/images/plaksha-symbol-teal.png">
+
+<!-- Tailwind CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  // Plaksha brand palette (from Brand Guidelines): Teal #007878, Aqua #00A0B4, Navy #005078
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          teal: {
+            50:  "#e6f2f2",
+            100: "#cfe6e5",
+            200: "#9fcccb",
+            300: "#66b0af",
+            400: "#2f9391",
+            500: "#007878",
+            600: "#006464",
+            700: "#005050",
+            800: "#17313A",
+            900: "#0f242b"
+          },
+          aqua: {
+            50:  "#e6f6f8",
+            100: "#cceff3",
+            200: "#99dfe7",
+            300: "#66cfdb",
+            400: "#33bfcf",
+            500: "#00A0B4",
+            600: "#008596",
+            700: "#006b78"
+          },
+          navy: {
+            500: "#005078",
+            600: "#013f5e"
+          }
+        }
+      }
+    }
+  };
+</script>
+
+<!-- Fonts: Open Sans (primary), Merriweather (serif display) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700;800&family=Merriweather:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-white text-teal-900">
+
+<!-- ============ GLOBAL NAV ============ -->
+<header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-teal-100">
+  <div class="max-w-7xl mx-auto px-5 sm:px-8">
+    <div class="flex items-center justify-between h-16 gap-6">
+
+      <!-- Brand -->
+      <a href="#top" class="flex items-center gap-2.5 shrink-0 focus-ring rounded">
+        <img src="frontend/images/plaksha-symbol-teal.png" alt="Plaksha University"
+             class="h-9 w-auto" style="height:36px;width:auto;">
+        <span class="font-serif font-bold text-lg sm:text-xl text-teal-700 tracking-tight"
+              style="color:#007878;">
+          ILGC Project Showcase
+        </span>
+      </a>
+
+      <!-- Center links -->
+      <nav class="hidden lg:flex items-center gap-8 text-sm font-semibold text-teal-800/80">
+        <a href="#explore" class="hover:text-teal-500 transition-colors">
+          Explore Projects
+        </a>
+
+        <a href="#what-is-ilgc" class="hover:text-teal-500 transition-colors">
+          About ILGC
+        </a>
+      </nav>
+
+      <!-- Login -->
+      <a href="login.html"
+         class="whitespace-nowrap px-4 py-2 rounded-full bg-teal-500 text-white text-sm font-semibold hover:bg-teal-600 transition-colors focus-ring">
+        Plaksha Login
+      </a>
+
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ============ WHAT IS ILGC ============ -->
+
+<section id="what-is-ilgc" class="what-ilgc-section">
+
+    <div class="what-ilgc-container">
+
+        <div class="what-ilgc-content">
+
+            <p class="what-ilgc-label">
+                THE COURSE
+            </p>
+
+            <h2>
+                What is ILGC?
+            </h2>
+
+            <p>
+                Innovation Lab & Grand Challenges (ILGC) studio is a
+                series of courses that introduces students to challenges
+                faced by our society and community that can be solved
+                with technological capabilities.
+            </p>
+
+            <p>
+                It is an integrated, project-based learning experience
+                that runs through the four-year B.Tech program and gives
+                students the opportunity to develop an interdisciplinary
+                appreciation for engineering from a technical and global
+                perspective.
+            </p>
+
+        </div>
+
+        <div class="what-ilgc-image">
+    <img src="frontend/images/ilgcOutView.jpeg" alt="ILGC students working on a project">
+      </div>
+
+    </div>
+
+</section>
+
+
+  <!-- ============ MORE ABOUT ILGC ============ -->
+
+<section id="about-ilgc" class="ilgc-section">
+
+    <div class="ilgc-container">
+
+        <!-- LEFT: TEXT -->
+
+        <div class="ilgc-text">
+
+            <p class="ilgc-label">
+                ABOUT ILGC
+            </p>
+
+            <h2>
+                More about ILGC
+            </h2>
+
+            <p class="ilgc-description">
+                This course is a signature element of the undergraduate
+                program and offers students an opportunity to develop
+                an interdisciplinary appreciation for engineering.
+                Watch this video to hear what faculty, students and
+                teaching assistants have to say about it.
+            </p>
+
+        </div>
+
+
+        <!-- RIGHT: VIDEO -->
+
+        <div class="ilgc-video-wrapper">
+
+            <div class="ilgc-video-border">
+
+                <a class="ilgc-video-link"
+                   href="https://www.youtube.com/watch?v=BV85A3o4Fcg"
+                   target="_blank"
+                   rel="noopener"
+                   aria-label="Watch the ILGC video on YouTube">
+                    <img class="ilgc-video-thumb"
+                         src="https://img.youtube.com/vi/BV85A3o4Fcg/hqdefault.jpg"
+                         alt="Innovation Lab & Grand Challenges Studio — Plaksha University">
+                    <span class="ilgc-video-play" aria-hidden="true">
+                        <svg viewBox="0 0 68 48" width="68" height="48">
+                            <path class="ilgc-play-bg" d="M66.52 7.74c-.78-2.93-2.49-5.41-5.42-6.19C55.79.13 34 0 34 0S12.21.13 6.9 1.55c-2.93.78-4.63 3.26-5.42 6.19C.06 13.05 0 24 0 24s.06 10.95 1.48 16.26c.78 2.93 2.49 5.41 5.42 6.19C12.21 47.87 34 48 34 48s21.79-.13 27.1-1.55c2.93-.78 4.64-3.26 5.42-6.19C67.94 34.95 68 24 68 24s-.06-10.95-1.48-16.26z"></path>
+                            <path d="M45 24 27 14v20" fill="#fff"></path>
+                        </svg>
+                    </span>
+                    <span class="ilgc-video-caption">Watch on YouTube</span>
+                </a>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+  <!-- ============ EXPLORE PROJECTS ============ -->
+
+<section id="explore" class="projects-section">
+    <div class="projects-container">
+
+        <div class="projects-heading">
+            <div>
+                <p class="projects-label">STUDENT WORK</p>
+                <h2>Explore Projects</h2>
+                <p class="projects-subtitle">
+                    Discover projects created by students across different domains.
+                </p>
+            </div>
+
+            <p id="resultCount" class="project-count"></p>
+        </div>
+
+        <!-- STATUS FILTERS -->
+        <div id="statusChips" class="domain-chips" style="margin-bottom:14px;"></div>
+
+        <!-- DOMAIN FILTERS -->
+        <div id="domains" class="domain-filters">
+            <div id="domainChips" class="domain-chips"></div>
+        </div>
+
+        <!-- PROJECT CARDS -->
+        <div id="cardGrid" class="project-grid"></div>
+
+        <p id="emptyState" class="empty-state hidden">
+            No projects match this domain.
+        </p>
+
+    </div>
+</section>
+
+  <!-- ============ ABOUT / FOOTER ============ -->
+  <section id="about" class="strand-field-light border-t border-teal-100 mt-4">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 py-14 grid md:grid-cols-3 gap-10">
+      <div class="md:col-span-2">
+        <h3 class="font-serif font-bold text-2xl text-teal-800 mb-3">About ILGC</h3>
+        <p class="text-teal-800/80 text-sm leading-relaxed max-w-xl">
+          The Institute for Leadership, Governance & Change at Plaksha University connects student researchers with faculty mentors to tackle applied problems in AI, robotics, sustainability, and healthcare technology. This showcase highlights work in progress and completed projects for recruiters, industry partners, and prospective students.
+        </p>
+      </div>
+      <div id="plaksha-login">
+        <img src="frontend/images/plaksha-logo-teal.png" alt="Plaksha University"
+             class="h-16 w-auto mb-4" style="height:64px;width:auto;">
+        <h4 class="font-semibold text-teal-800 mb-3 text-sm uppercase tracking-wide">For Plaksha members</h4>
+        <a href="login.html" class="inline-block px-5 py-2.5 rounded-full bg-teal-500 text-white text-sm font-semibold hover:bg-teal-600 transition-colors focus-ring">
+          Go to internal portal →
+        </a>
+      </div>
+    </div>
+    <div class="border-t border-teal-100 py-5 text-center text-xs text-teal-700/60">
+      © 2026 ILGC · Plaksha University
+    </div>
+  </section>
+
+</main>
+
+<!-- ============ PROJECT DETAIL MODAL ============ -->
+<div id="modalOverlay" class="fixed inset-0 z-50 hidden items-start sm:items-center justify-center bg-teal-900/60 backdrop-blur-sm p-0 sm:p-6 overflow-y-auto">
+  <div id="modalPanel" class="relative bg-white w-full sm:max-w-2xl sm:rounded-2xl sm:my-10 shadow-2xl fade-up">
+    <button id="modalClose" aria-label="Close project details"
+            class="absolute top-4 right-4 w-9 h-9 rounded-full bg-teal-50 hover:bg-teal-100 flex items-center justify-center text-teal-600 focus-ring z-10">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </button>
+    <div id="modalBody" class="p-6 sm:p-8"></div>
+  </div>
+</div>
+<script src="data.js"></script>
+<script src="script.js"></script>
+
+
+</body>
+</html>

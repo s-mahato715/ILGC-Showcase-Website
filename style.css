@@ -1,0 +1,759 @@
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: "Open Sans", Arial, sans-serif;
+}
+
+/* =====================================================
+   SIGNATURE MOTIF
+===================================================== */
+
+.strand-field {
+    background-image:
+        repeating-linear-gradient(
+            115deg,
+            rgba(255,255,255,0.09) 0px,
+            rgba(255,255,255,0.09) 2px,
+            transparent 2px,
+            transparent 26px
+        ),
+        repeating-linear-gradient(
+            65deg,
+            rgba(255,255,255,0.06) 0px,
+            rgba(255,255,255,0.06) 2px,
+            transparent 2px,
+            transparent 26px
+        );
+}
+
+.strand-field-light {
+    background-image:
+        repeating-linear-gradient(
+            115deg,
+            rgba(14,110,104,0.06) 0px,
+            rgba(14,110,104,0.06) 2px,
+            transparent 2px,
+            transparent 24px
+        ),
+        repeating-linear-gradient(
+            65deg,
+            rgba(0,169,184,0.05) 0px,
+            rgba(0,169,184,0.05) 2px,
+            transparent 2px,
+            transparent 24px
+        );
+}
+
+/* =====================================================
+   FOCUS
+===================================================== */
+
+.focus-ring:focus-visible {
+    outline: 2px solid #00A0B4;
+    outline-offset: 2px;
+}
+
+/* =====================================================
+   SCROLLBAR
+===================================================== */
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #A6D3CF;
+    border-radius: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* =====================================================
+   ANIMATION
+===================================================== */
+
+@keyframes fadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-up {
+    animation: fadeUp .45s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fade-up {
+        animation: none;
+    }
+
+    html {
+        scroll-behavior: auto;
+    }
+}
+
+/* =====================================================
+   WHAT IS ILGC
+===================================================== */
+
+.what-ilgc-section {
+    width: 100%;
+    background: #ffffff;
+    padding: 90px 0;
+    border-bottom: 1px solid #e5eeee;
+}
+
+.what-ilgc-container {
+    width: min(1200px, 88%);
+    margin: 0 auto;
+
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+
+    align-items: center;
+    gap: 70px;
+}
+
+.what-ilgc-content {
+    max-width: 700px;
+}
+
+.what-ilgc-label {
+    font-family: "Open Sans", sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+
+    color: #BE9B49;
+
+    margin-bottom: 18px;
+}
+
+.what-ilgc-content h2 {
+    font-family: "Merriweather", serif;
+    font-size: clamp(42px, 5vw, 68px);
+    font-weight: 700;
+
+    line-height: 1.1;
+    letter-spacing: -2px;
+
+    color: #17313A;
+
+    margin-bottom: 30px;
+}
+
+.what-ilgc-content p {
+    font-family: "Open Sans", sans-serif;
+
+    font-size: 16px;
+    line-height: 1.9;
+
+    color: #52636A;
+
+    margin-bottom: 18px;
+}
+
+/* =====================================================
+   ILGC IMAGE
+===================================================== */
+
+.what-ilgc-image {
+    width: 100%;
+    height: 380px;
+
+    overflow: hidden;
+
+    border-radius: 6px;
+
+    background: #E6E8EA;
+}
+
+.what-ilgc-image img {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+
+    display: block;
+
+    transition: transform .4s ease;
+}
+
+.what-ilgc-image:hover img {
+    transform: scale(1.03);
+}
+
+/* =====================================================
+   MORE ABOUT ILGC + VIDEO
+===================================================== */
+
+.ilgc-section {
+    width: 100%;
+
+    background: #111111;
+    color: #ffffff;
+
+    padding: 90px 0;
+}
+
+.ilgc-container {
+    width: min(1200px, 88%);
+    margin: 0 auto;
+
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+
+    align-items: center;
+
+    gap: 70px;
+}
+
+.ilgc-text {
+    max-width: 570px;
+}
+
+.ilgc-label {
+    font-family: "Open Sans", sans-serif;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+
+    color: #BE9B49;
+
+    margin-bottom: 18px;
+}
+
+.ilgc-text h2 {
+    font-family: "Merriweather", serif;
+
+    font-size: clamp(40px, 5vw, 64px);
+    font-weight: 700;
+
+    line-height: 1.1;
+    letter-spacing: -2px;
+
+    color: #ffffff;
+
+    margin-bottom: 35px;
+}
+
+.ilgc-description {
+    max-width: 570px;
+
+    font-family: "Open Sans", sans-serif;
+
+    font-size: 16px;
+    line-height: 2;
+
+    color: rgba(255,255,255,0.72);
+}
+
+/* =====================================================
+   YOUTUBE VIDEO
+===================================================== */
+
+.ilgc-video-wrapper {
+    display: flex;
+    justify-content: center;
+}
+
+.ilgc-video-border {
+    width: 100%;
+    max-width: 650px;
+
+    padding: 18px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #BE9B49 0%,
+            #5fc6a4 45%,
+            #00A0B4 100%
+        );
+}
+
+.ilgc-video-link {
+    display: block;
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: #000000;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.ilgc-video-thumb {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform .4s ease, opacity .3s ease;
+}
+
+.ilgc-video-link:hover .ilgc-video-thumb {
+    transform: scale(1.04);
+    opacity: 0.9;
+}
+
+.ilgc-video-play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.ilgc-video-play .ilgc-play-bg {
+    fill: #212121;
+    fill-opacity: 0.82;
+    transition: fill-opacity .3s ease;
+}
+
+.ilgc-video-link:hover .ilgc-play-bg {
+    fill: #cc0000;
+    fill-opacity: 1;
+}
+
+.ilgc-video-caption {
+    position: absolute;
+    bottom: 12px;
+    right: 14px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.72);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+/* =====================================================
+   EXPLORE PROJECTS
+===================================================== */
+
+.projects-section {
+    width: 100%;
+
+    background: #ffffff;
+
+    padding: 90px 0;
+}
+
+.projects-container {
+    width: min(1200px, 88%);
+    margin: 0 auto;
+}
+
+/* =====================================================
+   PROJECT HEADING
+===================================================== */
+
+.projects-heading {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-end;
+
+    gap: 30px;
+
+    margin-bottom: 30px;
+}
+
+.projects-label {
+    font-family: "Open Sans", sans-serif;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+
+    color: #BE9B49;
+
+    margin-bottom: 12px;
+}
+
+.projects-heading h2 {
+    font-family: "Merriweather", serif;
+
+    font-size: clamp(40px, 5vw, 64px);
+    font-weight: 700;
+
+    line-height: 1.1;
+
+    color: #17313A;
+
+    margin-bottom: 10px;
+}
+
+.projects-subtitle {
+    font-family: "Open Sans", sans-serif;
+
+    font-size: 16px;
+    line-height: 1.7;
+
+    color: #607278;
+}
+
+.project-count {
+    font-family: "Open Sans", sans-serif;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    color: #007878;
+
+    white-space: nowrap;
+}
+
+/* =====================================================
+   DOMAIN FILTERS
+===================================================== */
+
+.domain-filters {
+    margin-bottom: 40px;
+}
+
+.domain-chips {
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 10px;
+}
+
+.chip {
+    padding: 10px 18px;
+
+    border: 1px solid #C9DDDB;
+
+    border-radius: 999px;
+
+    background: #ffffff;
+
+    color: #334D5A;
+
+    font-family: "Open Sans", sans-serif;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition: all .2s ease;
+}
+
+.chip:hover {
+    border-color: #007878;
+
+    color: #007878;
+}
+
+.chip[data-active="true"] {
+    background: #007878;
+
+    color: #ffffff;
+
+    border-color: #007878;
+}
+
+/* =====================================================
+   PROJECT GRID
+===================================================== */
+
+.project-grid {
+    display: grid;
+
+    grid-template-columns: repeat(3, 1fr);
+
+    gap: 28px;
+}
+
+/* =====================================================
+   PROJECT CARD
+===================================================== */
+
+.project-card {
+    background: #ffffff;
+
+    border: 1px solid #D7E5E3;
+
+    border-radius: 16px;
+
+    overflow: hidden;
+
+    transition:
+        transform .25s ease,
+        box-shadow .25s ease;
+}
+
+.project-card:hover {
+    transform: translateY(-5px);
+
+    box-shadow:
+        0 15px 35px rgba(23,49,58,0.10);
+}
+
+/* =====================================================
+   PROJECT IMAGE
+===================================================== */
+
+.project-image {
+    width: 100%;
+
+    height: 230px;
+
+    overflow: hidden;
+
+    background: #E6E8EA;
+}
+
+.project-image img {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+
+    display: block;
+
+    transition: transform .4s ease;
+}
+
+.project-card:hover .project-image img {
+    transform: scale(1.04);
+}
+
+/* =====================================================
+   STATUS PILL (on project image) + SDG LINE
+===================================================== */
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    background: rgba(255,255,255,0.92);
+    color: #17313A;
+}
+
+.status-pill.badge-ongoing {
+    background: #E4F6EF;
+    color: #007878;
+}
+
+.status-pill.badge-completed {
+    background: #E9EEF3;
+    color: #334D5A;
+}
+
+.status-pill.badge-proposed {
+    background: #FDF0E6;
+    color: #C24E3A;
+}
+
+.project-sdg {
+    font-size: 12px;
+    font-weight: 600;
+    color: #007878;
+    margin-top: -14px;
+    margin-bottom: 18px;
+}
+
+/* =====================================================
+   PROJECT CONTENT
+===================================================== */
+
+.project-content {
+    padding: 25px;
+}
+
+/* Domain only */
+
+.project-domain {
+    font-family: "Open Sans", sans-serif;
+
+    font-size: 11px;
+    font-weight: 700;
+
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+
+    color: #007878;
+
+    margin-bottom: 12px;
+}
+
+/* Project title */
+
+.project-title {
+    font-family: "Merriweather", serif;
+
+    font-size: 22px;
+    font-weight: 700;
+
+    line-height: 1.35;
+
+    color: #17313A;
+
+    margin-bottom: 15px;
+}
+
+/* Project description */
+
+.project-description {
+    font-family: "Open Sans", sans-serif;
+
+    font-size: 14px;
+
+    line-height: 1.75;
+
+    color: #607278;
+
+    margin-bottom: 25px;
+}
+
+/* =====================================================
+   PROJECT FOOTER
+===================================================== */
+
+.project-footer {
+    border-top: 1px solid #D7E5E3;
+
+    padding-top: 18px;
+}
+
+.project-mentor {
+    font-family: "Open Sans", sans-serif;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    color: #17313A;
+}
+
+.project-batch {
+    font-family: "Open Sans", sans-serif;
+
+    font-size: 13px;
+
+    color: #789096;
+
+    margin-top: 3px;
+}
+
+/* =====================================================
+   EMPTY STATE
+===================================================== */
+
+.empty-state {
+    text-align: center;
+
+    padding: 60px 20px;
+
+    font-family: "Open Sans", sans-serif;
+
+    font-size: 14px;
+
+    color: #607278;
+}
+
+/* =====================================================
+   RESPONSIVE
+===================================================== */
+
+@media (max-width: 900px) {
+
+    .what-ilgc-container,
+    .ilgc-container {
+        grid-template-columns: 1fr;
+
+        gap: 50px;
+    }
+
+    .what-ilgc-content,
+    .ilgc-text {
+        max-width: 100%;
+    }
+
+    .ilgc-section {
+        padding: 75px 0;
+    }
+
+    .projects-heading {
+        align-items: flex-start;
+    }
+
+    .project-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+
+    .what-ilgc-container,
+    .ilgc-container,
+    .projects-container {
+        width: 90%;
+    }
+
+    .what-ilgc-section {
+        padding: 75px 0;
+    }
+
+    .what-ilgc-image {
+        height: 300px;
+    }
+
+    .ilgc-description,
+    .what-ilgc-content p {
+        font-size: 15px;
+
+        line-height: 1.8;
+    }
+
+    .ilgc-video-border {
+        padding: 10px;
+    }
+}
+
+@media (max-width: 600px) {
+
+    .projects-section {
+        padding: 70px 0;
+    }
+
+    .projects-heading {
+        flex-direction: column;
+
+        align-items: flex-start;
+
+        gap: 10px;
+    }
+
+    .project-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .project-image {
+        height: 220px;
+    }
+}
