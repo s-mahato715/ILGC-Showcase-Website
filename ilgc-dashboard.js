@@ -237,6 +237,17 @@ function groupCardHtml(project) {
 ====================================================== */
 
 function renderHome() {
+    const { data: mentor, error: mentorError } =
+        await window.supabaseClient
+            .from("mentor_profiles")
+            .select("name")
+            .eq("email", userId)
+            .maybeSingle();
+
+    if (!mentorError && mentor?.name) {
+        mentorName = mentor.name;
+        mentorProfileState.name = mentor.name;
+    }
     document.getElementById("greetingText").textContent = `Welcome back, ${mentorProfileState.name} 👋`;
     document.getElementById("greetingSub").textContent = `Mentor · ${userId}`;
 
