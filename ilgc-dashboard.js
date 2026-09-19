@@ -10,8 +10,9 @@ if (!loggedIn || role !== "ilgc" || !userId) {
     window.location.href = "login.html";
 }
 
-const mentorProfile = deriveIlgcMentorProfile(userId);
-const mentorName = mentorProfile.name;
+// For now, use the logged-in email as the mentor identity.
+// Mentor profile details will be added later.
+const mentorName = userId;
 
 /* ------------------------------------------------------
    Editable profile overlay (name shown + a short bio/title)
