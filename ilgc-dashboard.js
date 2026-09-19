@@ -10,19 +10,21 @@ if (!loggedIn || role !== "ilgc" || !userId) {
     window.location.href = "login.html";
 }
 
-// For now, use the logged-in email as the mentor identity.
-// Mentor profile details will be added later.
 let mentorName = userId;
 
-const { data: mentor, error: mentorError } =
-    await window.supabaseClient
-        .from("mentor_profiles")
-        .select("name")
-        .eq("email", userId)
-        .maybeSingle();
+async function loadMentorName() {
+    const { data: mentor, error: mentorError } =
+        await window.supabaseClient
+            .from("mentor_profiles")
+            .select("name")
+            .eq("email", userId)
+            .maybeSingle();
 
-if (!mentorError && mentor?.name) {
-    mentorName = mentor.name;
+    if (!mentorError && mentor?.name) {
+        mentorName = mentor.name;
+    }
+
+    initializeDashboard();
 }
 
 /* ------------------------------------------------------
