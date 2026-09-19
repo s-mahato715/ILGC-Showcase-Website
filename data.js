@@ -1211,3 +1211,15 @@ function removeSharePointFile(projectId, fileId) {
     store[projectId].files = store[projectId].files.filter((f) => f.id !== fileId);
     saveSharePointStore(store);
 }
+async function getMentorProfilesFromSupabase() {
+    const { data, error } = await window.supabaseClient
+        .from("mentor_profiles")
+        .select("*");
+
+    if (error) {
+        console.error("Error loading mentor profiles:", error);
+        return [];
+    }
+
+    return data || [];
+}
