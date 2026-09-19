@@ -235,7 +235,7 @@ function groupCardHtml(project) {
    RENDER: HOME
 ====================================================== */
 
-function renderHome() {
+async function renderHome() {
     const { data: mentor, error: mentorError } =
         await window.supabaseClient
             .from("mentor_profiles")
