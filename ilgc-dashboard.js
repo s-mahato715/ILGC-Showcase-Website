@@ -1,6 +1,9 @@
 /* ======================================================
    AUTH GUARD
 ====================================================== */
+/* ======================================================
+   AUTH GUARD
+====================================================== */
 
 const role = localStorage.getItem("selectedRole");
 const loggedIn = localStorage.getItem("loggedIn");
@@ -12,39 +15,10 @@ if (!loggedIn || role !== "ilgc" || !userId) {
 
 let mentorName = userId;
 
-async function loadMentorName() {
-    const { data: mentor, error: mentorError } =
-        await window.supabaseClient
-            .from("mentor_profiles")
-            .select("name")
-            .eq("email", userId)
-            .maybeSingle();
-
-    if (!mentorError && mentor?.name) {
-        mentorName = mentor.name;
-    }
-
-    initializeDashboard();
-}
-
-/* ------------------------------------------------------
-   Editable profile overlay (name shown + a short bio/title)
-   layered on top of the derived mentor identity, since
-   there's no backend profile record yet.
-------------------------------------------------------- */
 const MENTOR_PROFILE_KEY = `ilgc_mentor_profile_${userId}`;
 
-function loadMentorProfileOverlay() {
-    try {
-        const raw = localStorage.getItem(MENTOR_PROFILE_KEY);
-        return raw ? JSON.parse(raw) : {};
-    } catch (err) {
-        return {};
-    }
-}
-
 const mentorProfileState = {
-    name: mentorName,
+    name: userId,
     bio: ""
 };
 
@@ -53,6 +27,24 @@ function saveMentorProfileOverlay() {
         name: mentorProfileState.name,
         bio: mentorProfileState.bio
     }));
+}
+
+async function loadMentorName() {
+    const { data: mentor, error } =
+        await window.supabaseClient
+            .from("mentor_profiles")
+            .select("name")
+            .eq("email", userId)
+            .maybeSingle();
+
+    console.log("Logged in email:", userId);
+    console.log("Supabase mentor:", mentor);
+    console.log("Supabase error:", error);
+
+    if (!error && mentor?.name) {
+        mentorName = mentor.name;
+        mentorProfileState.name = mentor.name;
+    }
 }
 
 
@@ -235,20 +227,12 @@ function groupCardHtml(project) {
    RENDER: HOME
 ====================================================== */
 
-async function renderHome() {
-    const { data: mentor, error: mentorError } =
-        await window.supabaseClient
-            .from("mentor_profiles")
-            .select("name")
-            .eq("email", userId)
-            .maybeSingle();
+function renderHome() {
+    document.getElementById("greetingText").textContent =
+        `Welcome back, ${mentorProfileState.name} 👋`;
 
-    if (!mentorError && mentor?.name) {
-        mentorName = mentor.name;
-        mentorProfileState.name = mentor.name;
-    }
-    document.getElementById("greetingText").textContent = `Welcome back, ${mentorProfileState.name} 👋`;
-    document.getElementById("greetingSub").textContent = `Mentor · ${userId}`;
+    document.getElementById("greetingSub").textContent =
+        `Mentor · ${userId}`;
 
     const projects = getAllProjects();
     const groups = projects.filter((p) => (p.team || []).length > 0);
@@ -1198,13 +1182,16 @@ document.addEventListener("click", (e) => {
    RENDER ALL / INIT
 ====================================================== */
 
-function renderAll() {
+async function renderAll() {
+    await loadMentorName();
+
     renderHome();
     renderGroups();
     renderInterest();
     renderProposals();
     renderReports();
     renderNotifications();
+    renderProfile();
 }
 
 renderGroupsChips();
@@ -1212,5 +1199,4 @@ renderGroupsYearFilter();
 renderProposalsChips();
 renderProposalsDomainFilter();
 renderReportsChips();
-renderProfile();
 renderAll();
