@@ -12,7 +12,18 @@ if (!loggedIn || role !== "ilgc" || !userId) {
 
 // For now, use the logged-in email as the mentor identity.
 // Mentor profile details will be added later.
-const mentorName = userId;
+let mentorName = userId;
+
+const { data: mentor, error: mentorError } =
+    await window.supabaseClient
+        .from("mentor_profiles")
+        .select("name")
+        .eq("email", userId)
+        .maybeSingle();
+
+if (!mentorError && mentor?.name) {
+    mentorName = mentor.name;
+}
 
 /* ------------------------------------------------------
    Editable profile overlay (name shown + a short bio/title)
