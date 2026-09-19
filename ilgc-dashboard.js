@@ -45,8 +45,7 @@ function loadMentorProfileOverlay() {
 
 const mentorProfileState = {
     name: mentorName,
-    bio: "",
-    ...loadMentorProfileOverlay()
+    bio: ""
 };
 
 function saveMentorProfileOverlay() {
