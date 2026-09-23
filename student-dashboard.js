@@ -46,7 +46,7 @@ let enrolledProjects = [];
 async function loadEnrolledProjects() {
     enrolledProjects = [];
 
-    // Query project_members and join projects, domain, and mentors in one call
+    // Query project_members and join projects, domain, and mentors
     const { data, error } = await window.supabaseClient
         .from("project_members")
         .select(`
@@ -88,14 +88,13 @@ async function loadEnrolledProjects() {
         .map((item) => {
             const proj = item.projects;
             
-            // Format mentor name(s)
             const mentorNames = (proj.mentors || [])
                 .map((m) => m.users?.name)
                 .filter(Boolean)
-                .join(", ") || "ILGC Faculty";
+                .join(", ") || "Faculty Mentor";
 
             return {
-                id: proj.project_code, // bridges frontend project.id references
+                id: proj.project_code,
                 project_code: proj.project_code,
                 title: proj.title,
                 summary: proj.summary || proj.description || "No summary provided.",
@@ -107,11 +106,12 @@ async function loadEnrolledProjects() {
                 cohort: proj.academic_year || `Sem ${proj.semester || "N/A"}`,
                 memberRole: item.member_role || "student",
                 joinedAt: item.joined_at,
-                team: [] // will populate if team members are fetched
+                team: []
             };
         });
 
-    console.log("Successfully loaded enrolled projects:", enrolledProjects);
+    console.log("Enrolled projects loaded:", enrolledProjects);
+}
 }
 /* ======================================================
    INTERESTS STORAGE
@@ -324,9 +324,9 @@ function renderHome() {
 
     const myProjectPanel = document.getElementById("myProjectPanel");
 
-    if (myProject) {
+if (myProject) {
         myProjectPanel.innerHTML = `
-            <div class="my-project-card" data-goto="myprojects" style="cursor: pointer;" title="Click to view full workspace">
+            <div class="my-project-card" data-goto="myprojects" style="cursor: pointer;" title="Click to view workspace">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <p class="my-project-title">${myProject.title}</p>
                     <span style="font-size: 13px; color: var(--teal, #0d9488); font-weight: 500;">Open Workspace →</span>
@@ -339,12 +339,13 @@ function renderHome() {
             </div>
         `;
 
-        // Wire click to jump directly to the My Projects tab
-        myProjectPanel.querySelector(".my-project-card").addEventListener("click", () => {
-            goToTab("myprojects");
-        });
+        const card = myProjectPanel.querySelector(".my-project-card");
+        if (card) {
+            card.addEventListener("click", () => {
+                goToTab("myprojects");
+            });
+        }
     }
-}
 
 
 /* ======================================================
