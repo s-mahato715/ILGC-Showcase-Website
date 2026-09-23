@@ -46,62 +46,73 @@ let enrolledProjects = [];
 async function loadEnrolledProjects() {
     enrolledProjects = [];
 
-    // First get the projects this student belongs to
-    const { data: memberships, error: membershipError } =
-        await window.supabaseClient
-            .from("project_members")
-            .select("project_code, student_email, member_role, joined_at, left_at")
-            .eq("student_email", userId)
-            .is("left_at", null);
+    // Query project_members and join projects, domain, and mentors in one call
+    const { data, error } = await window.supabaseClient
+        .from("project_members")
+        .select(`
+            member_role,
+            joined_at,
+            projects:project_code (
+                project_code,
+                title,
+                description,
+                summary,
+                expected_outcome,
+                status,
+                progress,
+                academic_year,
+                semester,
+                image_url,
+                domain:domain_id ( name ),
+                mentors:project_mentors (
+                    mentor_role,
+                    users:mentor_email ( name )
+                )
+            )
+        `)
+        .eq("student_email", userId)
+        .is("left_at", null);
 
-    if (membershipError) {
-        console.error("Project membership error:", membershipError);
+    if (error) {
+        console.error("Project membership error:", error);
         return;
     }
 
-    if (!memberships || memberships.length === 0) {
+    if (!data || data.length === 0) {
+        console.log("No enrolled projects found for user:", userId);
         return;
     }
 
-    const projectCodes = [
-        ...new Set(
-            memberships
-                .map((member) => member.project_code)
+    enrolledProjects = data
+        .filter((item) => item.projects)
+        .map((item) => {
+            const proj = item.projects;
+            
+            // Format mentor name(s)
+            const mentorNames = (proj.mentors || [])
+                .map((m) => m.users?.name)
                 .filter(Boolean)
-        )
-    ];
+                .join(", ") || "ILGC Faculty";
 
-    if (projectCodes.length === 0) {
-        return;
-    }
+            return {
+                id: proj.project_code, // bridges frontend project.id references
+                project_code: proj.project_code,
+                title: proj.title,
+                summary: proj.summary || proj.description || "No summary provided.",
+                expectedOutcome: proj.expected_outcome || "To be decided.",
+                domain: proj.domain?.name || "General",
+                status: proj.status || "Ongoing",
+                progress: proj.progress || 0,
+                mentor: mentorNames,
+                cohort: proj.academic_year || `Sem ${proj.semester || "N/A"}`,
+                memberRole: item.member_role || "student",
+                joinedAt: item.joined_at,
+                team: [] // will populate if team members are fetched
+            };
+        });
 
-    // Now fetch the actual project details
-    const { data: projects, error: projectsError } =
-        await window.supabaseClient
-            .from("projects")
-            .select("*")
-            .in("project_code", projectCodes);
-
-    if (projectsError) {
-        console.error("Projects fetch error:", projectsError);
-        return;
-    }
-
-    enrolledProjects = (projects || []).map((project) => {
-        const membership = memberships.find(
-            (member) => member.project_code === project.project_code
-        );
-
-        return {
-            ...project,
-            memberRole: membership?.member_role || "",
-            joinedAt: membership?.joined_at || null
-        };
-    });
-
-    console.log("Enrolled projects:", enrolledProjects);
+    console.log("Successfully loaded enrolled projects:", enrolledProjects);
 }
-
 /* ======================================================
    INTERESTS STORAGE
    Stored per-user in localStorage (see data.js) as a
@@ -619,8 +630,7 @@ function myProjectFullCardHtml(project) {
             ${teamHtml}
 
             <p class="mp-block-title" style="margin-top:22px;">Milestones</p>
-            ${milestoneListHtml(project.id)}
-
+            ${milestoneListHtml(project.project_code || project.id)}
             ${sharePointHtml(project)}
         </article>
     `;
