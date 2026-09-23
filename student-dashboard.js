@@ -15,7 +15,21 @@ if (!loggedIn || role !== "student" || !userId) {
    STUDENT PROFILE (derived — see data.js)
 ====================================================== */
 
-const { name: studentName, semester: studentSemester } = deriveStudentProfile(userId);
+async function loadStudentProfile() {
+    const { data, error } = await window.supabaseClient
+        .from("users")
+        .select("name")
+        .eq("email", userId)
+        .maybeSingle();
+
+    if (error) {
+        console.error("Student profile error:", error);
+        studentName = userId;
+        return;
+    }
+
+    studentName = data?.name || userId;
+}
 
 
 /* ======================================================
