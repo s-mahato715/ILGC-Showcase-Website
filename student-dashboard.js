@@ -26,6 +26,59 @@ if (!loggedIn || role !== "student" || !userId) {
 
 let studentName = "Student";
 let studentSemester = "";
+let studentProgram = "";
+let studentDepartment = "";
+let studentRollNumber = "";
+async function loadStudentProfile() {
+    console.log("Loading student profile for:", userId);
+
+    const { data: user, error: userError } =
+        await window.supabaseClient
+            .from("users")
+            .select("email, name, role")
+            .eq("email", userId)
+            .maybeSingle();
+
+    if (userError) {
+        console.error("Could not load student user:", userError);
+        return;
+    }
+
+    console.log("Student user from Supabase:", user);
+
+    if (user?.name) {
+        studentName = user.name;
+    }
+
+    const { data: profile, error: profileError } =
+        await window.supabaseClient
+            .from("student_profiles")
+            .select(`
+                roll_number,
+                program,
+                department,
+                semester
+            `)
+            .eq("email", userId)
+            .maybeSingle();
+
+    if (profileError) {
+        console.error(
+            "Could not load student profile:",
+            profileError
+        );
+        return;
+    }
+
+    console.log("Student profile from Supabase:", profile);
+
+    if (profile) {
+        studentRollNumber = profile.roll_number || "";
+        studentProgram = profile.program || "";
+        studentDepartment = profile.department || "";
+        studentSemester = profile.semester || "";
+    }
+}
 
 
 /* ======================================================
@@ -1034,8 +1087,12 @@ function renderAll() {
 renderDiscoverChips();
 renderIdeasScopeChips();
 renderProfile();
-renderAll();
+async function initStudentDashboard() {
+    await loadStudentProfile();
+    renderAll();
+}
 
+initStudentDashboard();
 
 /* ======================================================
    SIDEBAR TOGGLE
