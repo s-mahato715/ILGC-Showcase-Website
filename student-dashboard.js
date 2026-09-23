@@ -84,6 +84,7 @@ async function loadStudentProfile() {
 async function loadStudentProjects() {
     console.log("Loading projects for student:", userId);
 
+    // 1. Get this student's active project memberships
     const { data: memberships, error: membershipError } =
         await window.supabaseClient
             .from("project_members")
@@ -98,7 +99,10 @@ async function loadStudentProjects() {
             .is("left_at", null);
 
     if (membershipError) {
-        console.error("Could not load student project memberships:", membershipError);
+        console.error(
+            "Could not load student project memberships:",
+            membershipError
+        );
         return [];
     }
 
@@ -112,6 +116,7 @@ async function loadStudentProjects() {
         ...new Set(memberships.map((m) => m.project_code))
     ];
 
+    // 2. Get project details
     const { data: projects, error: projectsError } =
         await window.supabaseClient
             .from("projects")
@@ -129,13 +134,110 @@ async function loadStudentProjects() {
             .in("project_code", projectCodes);
 
     if (projectsError) {
-        console.error("Could not load student projects:", projectsError);
+        console.error(
+            "Could not load student projects:",
+            projectsError
+        );
         return [];
     }
 
     console.log("Student projects from Supabase:", projects);
 
-    return projects || [];
+    // 3. Get all students in these projects
+    const { data: allMembers, error: membersError } =
+        await window.supabaseClient
+            .from("project_members")
+            .select(`
+                project_code,
+                student_email,
+                member_role,
+                joined_at
+            `)
+            .in("project_code", projectCodes)
+            .is("left_at", null);
+
+    if (membersError) {
+        console.error(
+            "Could not load project teammates:",
+            membersError
+        );
+        return [];
+    }
+
+    // 4. Get teammate names
+    const studentEmails = [
+        ...new Set(
+            (allMembers || []).map((member) => member.student_email)
+        )
+    ];
+
+    const { data: students, error: studentsError } =
+        await window.supabaseClient
+            .from("users")
+            .select("email, name")
+            .in("email", studentEmails);
+
+    if (studentsError) {
+        console.error(
+            "Could not load teammate names:",
+            studentsError
+        );
+    }
+
+    const studentMap = new Map(
+        (students || []).map((student) => [
+            student.email,
+            student
+        ])
+    );
+
+    // 5. Convert Supabase data into the format
+    //    the existing My Projects card expects
+    return (projects || []).map((project) => {
+        const members = (allMembers || [])
+            .filter(
+                (member) =>
+                    member.project_code === project.project_code
+            );
+
+        const team = members.map((member) => ({
+            name:
+                studentMap.get(member.student_email)?.name ||
+                member.student_email,
+            email: member.student_email,
+            role: member.member_role
+        }));
+
+        return {
+            id: project.project_code,
+            projectCode: project.project_code,
+
+            title: project.title,
+            summary:
+                project.description ||
+                project.summary ||
+                "",
+
+            expectedOutcome:
+                project.expected_outcome || "",
+
+            status:
+                project.status
+                    ? project.status.charAt(0).toUpperCase() +
+                      project.status.slice(1)
+                    : "Proposed",
+
+            progress: project.progress ?? 0,
+
+            cohort: project.academic_year || "",
+            semester: project.semester || "",
+
+            domain: "",
+            mentor: "Faculty mentor",
+
+            team
+        };
+    });
 }
 
 /* ======================================================
@@ -616,47 +718,107 @@ function sharePointHtml(project) {
 }
 
 function myProjectFullCardHtml(project) {
-    const teammates = (project.team || []).filter((m) => m.name !== studentName);
+    const teammates = (project.team || []).filter(
+        (member) => member.email !== userId
+    );
+
     const teamHtml = teammates.length
-        ? `<div class="modal-team">${teammates.map((m) => `<span class="team-chip">${m.name} · Sem ${m.semester} · ${yearFromSemester(m.semester)}</span>`).join("")}</div>`
-        : `<p class="empty-panel">You're the only student on this project so far.</p>`;
+        ? `
+            <div class="modal-team">
+                ${teammates.map((member) => `
+                    <span class="team-chip">
+                        ${member.name}
+                    </span>
+                `).join("")}
+            </div>
+        `
+        : `
+            <p class="empty-panel">
+                You're the only student on this project so far.
+            </p>
+        `;
 
     return `
         <article class="mp-card">
+
             <div class="mp-card-top">
-                <span class="project-domain">${project.domain}</span>
-                <span class="badge ${statusBadgeClass(project.status)}">${project.status}</span>
+                <span class="project-domain">
+                    ${project.projectCode}
+                </span>
+
+                <span class="badge ${statusBadgeClass(project.status)}">
+                    ${project.status}
+                </span>
             </div>
 
-            <h2 class="mp-title">${project.title}</h2>
-            <p class="mp-summary">${project.summary}</p>
+            <h2 class="mp-title">
+                ${project.title}
+            </h2>
+
+            <p class="mp-summary">
+                ${project.summary}
+            </p>
 
             <div class="mp-meta-grid">
+
                 <div class="mp-meta-item">
-                    <span class="meta-label">Faculty mentor</span>
-                    <span class="meta-value">${project.mentor}</span>
+                    <span class="meta-label">
+                        Academic year
+                    </span>
+
+                    <span class="meta-value">
+                        ${project.cohort || "—"}
+                    </span>
                 </div>
+
                 <div class="mp-meta-item">
-                    <span class="meta-label">Cohort</span>
-                    <span class="meta-value">${project.cohort}</span>
+                    <span class="meta-label">
+                        Semester
+                    </span>
+
+                    <span class="meta-value">
+                        ${project.semester || "—"}
+                    </span>
                 </div>
+
                 <div class="mp-meta-item">
-                    <span class="meta-label">Progress</span>
-                    <span class="meta-value">${project.progress}%</span>
+                    <span class="meta-label">
+                        Progress
+                    </span>
+
+                    <span class="meta-value">
+                        ${project.progress}%
+                    </span>
                 </div>
+
             </div>
 
             <div class="progress-track" style="margin-bottom:20px;">
-                <div class="progress-fill" style="width:${project.progress}%"></div>
+                <div
+                    class="progress-fill"
+                    style="width:${project.progress}%"
+                ></div>
             </div>
 
-            <p class="mp-block-title">Teammates</p>
+            <p class="mp-block-title">
+                Teammates
+            </p>
+
             ${teamHtml}
 
-            <p class="mp-block-title" style="margin-top:22px;">Milestones</p>
-            ${milestoneListHtml(project.id)}
+            <p
+                class="mp-block-title"
+                style="margin-top:22px;"
+            >
+                Project outcome
+            </p>
+
+            <p class="mp-summary">
+                ${project.expectedOutcome || "Not specified yet."}
+            </p>
 
             ${sharePointHtml(project)}
+
         </article>
     `;
 }
