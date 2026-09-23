@@ -12,8 +12,12 @@ if (!loggedIn || role !== "student" || !userId) {
 
 
 /* ======================================================
-   STUDENT PROFILE (derived — see data.js)
+   STUDENT PROFILE
+   Loaded from Supabase users table
 ====================================================== */
+
+let studentName = userId;
+let studentSemester = "";
 
 async function loadStudentProfile() {
     const { data, error } = await window.supabaseClient
@@ -30,7 +34,73 @@ async function loadStudentProfile() {
 
     studentName = data?.name || userId;
 }
+/* ======================================================
+   ENROLLED PROJECTS
+   Source of truth:
+   project_members.student_email -> project_code
+   projects.project_code -> project details
+====================================================== */
 
+let enrolledProjects = [];
+
+async function loadEnrolledProjects() {
+    enrolledProjects = [];
+
+    // First get the projects this student belongs to
+    const { data: memberships, error: membershipError } =
+        await window.supabaseClient
+            .from("project_members")
+            .select("project_code, student_email, member_role, joined_at, left_at")
+            .eq("student_email", userId)
+            .is("left_at", null);
+
+    if (membershipError) {
+        console.error("Project membership error:", membershipError);
+        return;
+    }
+
+    if (!memberships || memberships.length === 0) {
+        return;
+    }
+
+    const projectCodes = [
+        ...new Set(
+            memberships
+                .map((member) => member.project_code)
+                .filter(Boolean)
+        )
+    ];
+
+    if (projectCodes.length === 0) {
+        return;
+    }
+
+    // Now fetch the actual project details
+    const { data: projects, error: projectsError } =
+        await window.supabaseClient
+            .from("projects")
+            .select("*")
+            .in("project_code", projectCodes);
+
+    if (projectsError) {
+        console.error("Projects fetch error:", projectsError);
+        return;
+    }
+
+    enrolledProjects = (projects || []).map((project) => {
+        const membership = memberships.find(
+            (member) => member.project_code === project.project_code
+        );
+
+        return {
+            ...project,
+            memberRole: membership?.member_role || "",
+            joinedAt: membership?.joined_at || null
+        };
+    });
+
+    console.log("Enrolled projects:", enrolledProjects);
+}
 
 /* ======================================================
    INTERESTS STORAGE
@@ -81,18 +151,18 @@ function simulateFacultyResponse(projectId) {
 
 
 /* ======================================================
-   MY PROJECT (derived from an accepted interest)
+   MY PROJECTS
+   Based on project_members, NOT localStorage interests
 ====================================================== */
 
 function getMyProject() {
-    const accepted = interests.find((i) => i.status === "Accepted");
-    if (!accepted) return null;
-    return getAllProjects().find((p) => p.id === accepted.projectId) || null;
+    return enrolledProjects.length > 0
+        ? enrolledProjects[0]
+        : null;
 }
 
 function getMyProjects() {
-    const acceptedIds = interests.filter((i) => i.status === "Accepted").map((i) => i.projectId);
-    return getAllProjects().filter((p) => acceptedIds.includes(p.id));
+    return enrolledProjects;
 }
 
 
@@ -219,7 +289,8 @@ function interestBadgeClass(status) {
 
 function renderHome() {
     document.getElementById("greetingText").textContent = `Hi, ${studentName} 👋`;
-    document.getElementById("greetingSub").textContent = `Semester ${studentSemester} · ${cohortCodeFromSemester(studentSemester)} · ${userId}`;
+    document.getElementById("greetingSub").textContent =
+    `${userId}`;
 
     const myProject = getMyProject();
     const pendingCount = interests.filter((i) => i.status === "Pending").length;
@@ -1035,10 +1106,17 @@ function renderAll() {
     renderNotifBadge();
 }
 
-renderDiscoverChips();
-renderIdeasScopeChips();
-renderProfile();
-renderAll();
+async function initDashboard() {
+    await loadStudentProfile();
+    await loadEnrolledProjects();
+
+    renderDiscoverChips();
+    renderIdeasScopeChips();
+    renderProfile();
+    renderAll();
+}
+
+initDashboard();
 
 
 /* ======================================================
