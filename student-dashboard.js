@@ -34,7 +34,7 @@ let studentSemester = "";
    stand-in for the backend: [{ projectId, status, submittedAt }]
 ====================================================== */
 
-let interests = loadInterestsFor(userId);
+let interests = [];
 
 function getInterest(projectId) {
     return interests.find((i) => i.projectId === projectId) || null;
