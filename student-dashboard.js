@@ -30,6 +30,7 @@ let studentProgram = "";
 let studentDepartment = "";
 let studentRollNumber = "";
 let studentProjects = [];
+let discoverProjects = [];
 async function loadStudentProfile() {
     console.log("Loading student profile for:", userId);
 
@@ -240,6 +241,72 @@ async function loadStudentProjects() {
     });
 }
 
+async function loadDiscoverProjects() {
+    console.log("Loading Discover Projects from Supabase...");
+
+    const { data: projects, error } =
+        await window.supabaseClient
+            .from("projects")
+            .select(`
+                project_code,
+                title,
+                description,
+                summary,
+                expected_outcome,
+                status,
+                progress,
+                academic_year,
+                semester
+            `)
+            .order("project_code");
+
+    if (error) {
+        console.error(
+            "Could not load Discover Projects:",
+            error
+        );
+        discoverProjects = [];
+        return;
+    }
+
+    console.log(
+        "Discover Projects from Supabase:",
+        projects
+    );
+
+    discoverProjects = (projects || []).map((project) => ({
+        id: project.project_code,
+        projectCode: project.project_code,
+
+        title: project.title,
+
+        summary:
+            project.description ||
+            project.summary ||
+            "",
+
+        expectedOutcome:
+            project.expected_outcome || "",
+
+        status:
+            project.status
+                ? project.status.charAt(0).toUpperCase() +
+                  project.status.slice(1)
+                : "Proposed",
+
+        progress: project.progress ?? 0,
+
+        cohort: project.academic_year || "",
+        semester: project.semester || "",
+
+        // We'll connect these to Supabase next.
+        domain: "",
+        mentor: "Faculty mentor",
+
+        origin: "faculty"
+    }));
+}
+
 /* ======================================================
    INTERESTS STORAGE
    Stored per-user in localStorage (see data.js) as a
@@ -391,19 +458,33 @@ let activeMentor = "All";
 let searchTerm = "";
 
 function matchesFilters(project) {
-    const statusMatch = activeStatus === "All" || project.status === activeStatus;
-    const domainMatch = activeDomain === "All" || project.domain === activeDomain;
-    const mentorMatch = activeMentor === "All" || project.mentor === activeMentor;
+    const statusMatch =
+        activeStatus === "All" ||
+        project.status === activeStatus;
+
+    const domainMatch =
+        activeDomain === "All" ||
+        project.domain === activeDomain;
+
+    const mentorMatch =
+        activeMentor === "All" ||
+        project.mentor === activeMentor;
 
     const term = searchTerm.toLowerCase();
+
     const searchMatch =
         !term ||
-        project.title.toLowerCase().includes(term) ||
-        project.summary.toLowerCase().includes(term) ||
-        project.domain.toLowerCase().includes(term) ||
-        project.mentor.toLowerCase().includes(term);
+        (project.title || "").toLowerCase().includes(term) ||
+        (project.summary || "").toLowerCase().includes(term) ||
+        (project.domain || "").toLowerCase().includes(term) ||
+        (project.mentor || "").toLowerCase().includes(term);
 
-    return statusMatch && domainMatch && mentorMatch && searchMatch;
+    return (
+        statusMatch &&
+        domainMatch &&
+        mentorMatch &&
+        searchMatch
+    );
 }
 
 function statusBadgeClass(status) {
@@ -521,7 +602,16 @@ function actionButtonHtml(project) {
 }
 
 function studentDiscoverMentors() {
-    return ["All", ...[...new Set(getAllProjects().map((p) => p.mentor).filter(Boolean))].sort()];
+    return [
+        "All",
+        ...[
+            ...new Set(
+                discoverProjects
+                    .map((p) => p.mentor)
+                    .filter(Boolean)
+            )
+        ].sort()
+    ];
 }
 
 function renderDiscoverChips() {
@@ -542,7 +632,7 @@ function renderDiscoverChips() {
 }
 
 function renderDiscover() {
-    const filtered = getAllProjects().filter(matchesFilters);
+    const filtered = discoverProjects.filter(matchesFilters);
     const grid = document.getElementById("discoverGrid");
     const empty = document.getElementById("discoverEmpty");
 
@@ -1311,6 +1401,9 @@ async function initStudentDashboard() {
 
     studentProjects = await loadStudentProjects();
 
+    await loadDiscoverProjects();
+
+    renderDiscoverChips();
     renderAll();
 }
 
