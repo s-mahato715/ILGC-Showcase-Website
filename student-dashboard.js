@@ -665,7 +665,7 @@ function renderMyProjectsFull() {
     const container = document.getElementById("myProjectsFull");
     if (!container) return;
 
-    const projects = getMyProjects();
+    const projects = studentProjects;
 
     if (projects.length === 0) {
         container.innerHTML = `
