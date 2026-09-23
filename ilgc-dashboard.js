@@ -37,9 +37,9 @@ async function loadMentorName() {
             .eq("email", userId)
             .maybeSingle();
 
-    console.log("Logged in email:", userId);
-    console.log("Supabase mentor:", mentor);
-    console.log("Supabase error:", error);
+    console.log("ILGC logged-in email:", userId);
+    console.log("ILGC mentor from Supabase:", mentor);
+    console.log("ILGC mentor lookup error:", error);
 
     if (!error && mentor?.name) {
         mentorName = mentor.name;
