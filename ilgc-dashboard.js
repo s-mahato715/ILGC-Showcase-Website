@@ -451,21 +451,29 @@ function renderGroups() {
     empty.classList.add("hidden");
 
     grid.innerHTML = mentorGroups.map((group) => {
-        const studentsHtml = group.students.map((student) => `
-            <div class="team-chip">
-                <strong>${student.name}</strong>
-                <span style="opacity:0.7;">
-                    · ${student.email}
-                </span>
-            </div>
-        `).join("");
+        const studentsHtml = group.students.map((student) => {
+            const initial = (student.name || "?").charAt(0).toUpperCase();
+
+            return `
+                <div class="student-row">
+                    <div class="student-avatar">
+                        ${initial}
+                    </div>
+
+                    <div class="student-info">
+                        <strong>${student.name}</strong>
+                        <span>${student.email}</span>
+                    </div>
+                </div>
+            `;
+        }).join("");
 
         return `
-            <article class="group-card">
+            <article class="group-card mentor-project-card">
 
                 <div class="group-card-top">
-                    <span class="project-domain">
-                        Students
+                    <span class="project-code">
+                        ${group.projectCode}
                     </span>
 
                     <span class="badge badge-ongoing">
@@ -477,14 +485,14 @@ function renderGroups() {
                 <div class="group-card-body">
 
                     <h3 class="group-title">
-                        My Students
+                        Project ${group.projectCode}
                     </h3>
 
-                    <p class="group-mentor">
-                        Students working under this project
-                    </p>
+                    <div class="students-heading">
+                        <span>STUDENTS (${group.students.length})</span>
+                    </div>
 
-                    <div class="modal-team" style="margin-top:16px;">
+                    <div class="student-list">
                         ${studentsHtml}
                     </div>
 
