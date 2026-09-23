@@ -326,8 +326,11 @@ function renderHome() {
 
     if (myProject) {
         myProjectPanel.innerHTML = `
-            <div class="my-project-card">
-                <p class="my-project-title">${myProject.title}</p>
+            <div class="my-project-card" data-goto="myprojects" style="cursor: pointer;" title="Click to view full workspace">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <p class="my-project-title">${myProject.title}</p>
+                    <span style="font-size: 13px; color: var(--teal, #0d9488); font-weight: 500;">Open Workspace →</span>
+                </div>
                 <p class="my-project-meta">${myProject.domain} · Mentor: ${myProject.mentor}</p>
                 <div class="progress-track">
                     <div class="progress-fill" style="width:${myProject.progress}%"></div>
@@ -335,40 +338,12 @@ function renderHome() {
                 <p class="progress-label">${myProject.progress}% complete</p>
             </div>
         `;
-    } else {
-        myProjectPanel.innerHTML = `
-            <p class="empty-panel">
-                You're not on a project team yet. Browse
-                <a data-goto="discover">Discover Projects</a>
-                and express interest to get started.
-            </p>
-        `;
-        myProjectPanel.querySelector("[data-goto]").addEventListener("click", (e) => {
-            goToTab(e.target.dataset.goto);
+
+        // Wire click to jump directly to the My Projects tab
+        myProjectPanel.querySelector(".my-project-card").addEventListener("click", () => {
+            goToTab("myprojects");
         });
     }
-
-    const previewEl = document.getElementById("myInterestsPreview");
-    const recent = [...interests].reverse().slice(0, 3);
-
-    if (recent.length === 0) {
-        previewEl.innerHTML = `<p class="empty-panel">No interests submitted yet.</p>`;
-        return;
-    }
-
-    previewEl.innerHTML = recent.map((interest) => {
-        const project = getAllProjects().find((p) => p.id === interest.projectId);
-        if (!project) return "";
-        return `
-            <div class="mini-interest-row">
-                <div>
-                    <p class="mini-interest-title">${project.title}</p>
-                    <p class="mini-interest-domain">${project.domain}</p>
-                </div>
-                <span class="badge ${interestBadgeClass(interest.status)}">${interest.status}</span>
-            </div>
-        `;
-    }).join("");
 }
 
 
