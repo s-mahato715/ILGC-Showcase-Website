@@ -55,7 +55,7 @@ let mentorGroups = [];
 async function loadMentorGroups() {
     console.log("Loading groups for mentor:", userId);
 
-    // Get the projects assigned to the logged-in mentor
+    // 1. Find projects assigned to the logged-in mentor
     const { data: mentorProjects, error: mentorProjectsError } =
         await window.supabaseClient
             .from("project_mentors")
@@ -70,14 +70,16 @@ async function loadMentorGroups() {
 
     console.log("Mentor projects:", mentorProjects);
 
-    if (!mentorProjects || mentorProjects.length === 0) {
+    const projectCodes = (mentorProjects || []).map(
+        (project) => project.project_code
+    );
+
+    if (projectCodes.length === 0) {
         mentorGroups = [];
         return;
     }
 
-    const projectCodes = mentorProjects.map((p) => p.project_code);
-
-    // Get active students belonging to those projects
+    // 2. Find ACTIVE students in those projects
     const { data: members, error: membersError } =
         await window.supabaseClient
             .from("project_members")
@@ -102,17 +104,16 @@ async function loadMentorGroups() {
     console.log("Mentor project members:", members);
 
     if (!members || members.length === 0) {
-        mentorGroups = projectCodes.map((projectCode) => ({
-            projectCode,
-            students: []
-        }));
+        mentorGroups = [];
         return;
     }
 
-    // Get the student names from users
-    const studentEmails = [...new Set(
-        members.map((member) => member.student_email)
-    )];
+    // 3. Get student names from users
+    const studentEmails = [
+        ...new Set(
+            members.map((member) => member.student_email)
+        )
+    ];
 
     const { data: students, error: studentsError } =
         await window.supabaseClient
@@ -126,6 +127,8 @@ async function loadMentorGroups() {
         return;
     }
 
+    console.log("Student users:", students);
+
     const studentMap = new Map(
         (students || []).map((student) => [
             student.email,
@@ -133,25 +136,31 @@ async function loadMentorGroups() {
         ])
     );
 
-    mentorGroups = projectCodes.map((projectCode) => {
-        const projectMembers = members.filter(
-            (member) => member.project_code === projectCode
-        );
+    // 4. Group students by project
+    const groupsMap = new Map();
 
-        return {
-            projectCode,
-            students: projectMembers.map((member) => {
-                const student = studentMap.get(member.student_email);
+    members.forEach((member) => {
+        if (!groupsMap.has(member.project_code)) {
+            groupsMap.set(member.project_code, []);
+        }
 
-                return {
-                    email: member.student_email,
-                    name: student?.name || member.student_email,
-                    role: member.member_role,
-                    joinedAt: member.joined_at
-                };
-            })
-        };
+        const student = studentMap.get(member.student_email);
+
+        groupsMap.get(member.project_code).push({
+            email: member.student_email,
+            name: student?.name || member.student_email,
+            role: member.member_role,
+            joinedAt: member.joined_at
+        });
     });
+
+    // 5. ONLY keep projects that actually have students
+    mentorGroups = Array.from(groupsMap.entries()).map(
+        ([projectCode, students]) => ({
+            projectCode,
+            students
+        })
+    );
 
     console.log("Final mentor groups:", mentorGroups);
 }
@@ -343,8 +352,7 @@ function renderHome() {
     document.getElementById("greetingSub").textContent =
         `Mentor · ${userId}`;
 
-    const projects = getAllProjects();
-    const groups = projects.filter((p) => (p.team || []).length > 0);
+    const groups = mentorGroups || [];
     const activeProjects = projects.filter((p) => p.status === "Ongoing").length;
     const pendingInterests = getAllInterestsAcrossStudents().filter((i) => i.status === "Pending");
     const pendingProposals = getAllIdeas().filter((i) => i.status === "Pending" || i.status === "Needs Revision");
@@ -443,37 +451,45 @@ function renderGroups() {
     empty.classList.add("hidden");
 
     grid.innerHTML = mentorGroups.map((group) => {
-        const studentCount = group.students.length;
-
-        const studentsHtml = studentCount
-            ? group.students.map((student) => `
-                <div class="team-chip">
-                    ${student.name}
-                    <span style="opacity:0.7;">· ${student.email}</span>
-                </div>
-            `).join("")
-            : `<p class="modal-text">No students in this group yet.</p>`;
+        const studentsHtml = group.students.map((student) => `
+            <div class="team-chip">
+                <strong>${student.name}</strong>
+                <span style="opacity:0.7;">
+                    · ${student.email}
+                </span>
+            </div>
+        `).join("");
 
         return `
             <article class="group-card">
+
                 <div class="group-card-top">
-                    <span class="project-domain">Project</span>
+                    <span class="project-domain">
+                        Students
+                    </span>
+
                     <span class="badge badge-ongoing">
-                        ${studentCount} student${studentCount !== 1 ? "s" : ""}
+                        ${group.students.length}
+                        student${group.students.length !== 1 ? "s" : ""}
                     </span>
                 </div>
 
                 <div class="group-card-body">
-                    <h3 class="group-title">${group.projectCode}</h3>
+
+                    <h3 class="group-title">
+                        My Students
+                    </h3>
 
                     <p class="group-mentor">
-                        Students who chose this project
+                        Students working under this project
                     </p>
 
                     <div class="modal-team" style="margin-top:16px;">
                         ${studentsHtml}
                     </div>
+
                 </div>
+
             </article>
         `;
     }).join("");
