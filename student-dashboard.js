@@ -260,8 +260,7 @@ async function loadDiscoverProjects() {
                 status,
                 progress,
                 academic_year,
-                semester,
-                domain_id
+                semester
             `)
             .order("project_code");
 
@@ -287,51 +286,111 @@ async function loadDiscoverProjects() {
     );
 
     // --------------------------------------------------
-    // 2. LOAD DOMAINS
-    // --------------------------------------------------
+// 2. LOAD DOMAINS
+//    projects → project_domain_map → project_domains
+// --------------------------------------------------
 
-    const domainIds = [
-        ...new Set(
-            projects
-                .map((project) => project.domain_id)
-                .filter(Boolean)
-        )
-    ];
+let domainMappings = [];
+let domains = [];
 
-    let domains = [];
+// Get project ↔ domain relationships
+const { data: mappingData, error: mappingError } =
+    await window.supabaseClient
+        .from("project_domain_map")
+        .select("project_code, domain_id")
+        .in("project_code", projectCodes);
 
-    if (domainIds.length > 0) {
-        const { data: domainData, error: domainError } =
-            await window.supabaseClient
-                .from("project_domains")
-                .select("domain_id, name")
-                .in("domain_id", domainIds);
+if (mappingError) {
+    console.error(
+        "Could not load project-domain mappings:",
+        mappingError
+    );
+} else {
+    domainMappings = mappingData || [];
+}
 
-        if (domainError) {
-            console.error(
-                "Could not load project domains:",
-                domainError
-            );
-        } else {
-            domains = domainData || [];
-        }
+console.log(
+    "Project-domain mappings from Supabase:",
+    domainMappings
+);
+
+// Get the unique domain IDs
+const domainIds = [
+    ...new Set(
+        domainMappings
+            .map((mapping) => mapping.domain_id)
+            .filter(Boolean)
+    )
+];
+
+// Get domain names
+if (domainIds.length > 0) {
+    const { data: domainData, error: domainError } =
+        await window.supabaseClient
+            .from("project_domains")
+            .select("domain_id, name")
+            .in("domain_id", domainIds);
+
+    if (domainError) {
+        console.error(
+            "Could not load project domains:",
+            domainError
+        );
+    } else {
+        domains = domainData || [];
+    }
+}
+
+console.log(
+    "Project domains from Supabase:",
+    domains
+);
+
+// domain_id → domain name
+const domainMap = new Map(
+    domains.map((domain) => [
+        domain.domain_id,
+        domain.name
+    ])
+);
+
+// project_code → array of domain names
+const projectDomainMap = new Map();
+
+domainMappings.forEach((mapping) => {
+    const domainName = domainMap.get(mapping.domain_id);
+
+    if (!domainName) return;
+
+    if (!projectDomainMap.has(mapping.project_code)) {
+        projectDomainMap.set(mapping.project_code, []);
     }
 
-    console.log("Project domains from Supabase:", domains);
+    projectDomainMap
+        .get(mapping.project_code)
+        .push(domainName);
+});
 
-    const domainMap = new Map(
-        domains.map((domain) => [
-            domain.domain_id,
-            domain.name
-        ])
-    );
-   DOMAINS = [
+// Add the domain array to each project
+projects.forEach((project) => {
+    project.domains =
+        projectDomainMap.get(project.project_code) || [];
+});
+
+// Create Domain filter options
+DOMAINS = [
     "All",
-    ...domains
-        .map((domain) => domain.name)
-        .filter(Boolean)
-        .sort()
+    ...new Set(
+        projects.flatMap(
+            (project) => project.domains
+        )
+    )
 ];
+
+console.log(
+    "Final Domain filters:",
+    DOMAINS
+);
 
     // --------------------------------------------------
     // 3. LOAD PROJECT MENTORS
@@ -455,9 +514,15 @@ async function loadDiscoverProjects() {
 
             semester: project.semester || "",
 
+            domains:
+               project.domains || [],
+
             domain:
-                domainMap.get(project.domain_id) ||
-                "Other",
+               (project.domains && project.domains.length > 0)
+               ? project.domains.join(" · ")
+               : "Other",
+                
+                
 
             mentor:
                 mentorNames.length > 0
@@ -625,11 +690,13 @@ function matchesFilters(project) {
     const selectedStatus =
         String(activeStatus || "").trim().toLowerCase();
 
-    const projectDomain =
-        String(project.domain || "").trim().toLowerCase();
+    const projectDomains = (project.domains || [])
+    .map((domain) =>
+        String(domain).trim().toLowerCase()
+    );
 
     const selectedDomain =
-        String(activeDomain || "").trim().toLowerCase();
+       String(activeDomain || "").trim().toLowerCase();
 
     const projectMentor =
         String(project.mentor || "").trim().toLowerCase();
@@ -641,9 +708,9 @@ function matchesFilters(project) {
         activeStatus === "All" ||
         projectStatus === selectedStatus;
 
-    const domainMatch =
-        activeDomain === "All" ||
-        projectDomain === selectedDomain;
+   const domainMatch =
+      activeDomain === "All" ||
+      projectDomains.includes(selectedDomain);
 
     const mentorMatch =
         activeMentor === "All" ||
