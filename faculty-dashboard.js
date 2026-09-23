@@ -2,6 +2,10 @@
    AUTH GUARD
 ====================================================== */
 
+/* ======================================================
+   SUPABASE + AUTH
+====================================================== */
+
 const role = localStorage.getItem("selectedRole");
 const loggedIn = localStorage.getItem("loggedIn");
 const userId = localStorage.getItem("userId");
@@ -10,8 +14,76 @@ if (!loggedIn || role !== "faculty" || !userId) {
     window.location.href = "login.html";
 }
 
-const facultyProfile = deriveFacultyProfile(userId);
-const facultyName = facultyProfile.name;
+let facultyProfile = null;
+let facultyName = "";
+let facultyEmail = userId;
+
+
+/* ======================================================
+   LOAD FACULTY PROFILE FROM SUPABASE
+====================================================== */
+
+async function loadFacultyProfile() {
+    if (!window.supabaseClient) {
+        console.error("Supabase client is not available.");
+        return false;
+    }
+
+    console.log("Faculty email:", facultyEmail);
+
+    const { data: user, error: userError } =
+        await window.supabaseClient
+            .from("users")
+            .select("email, name, role")
+            .eq("email", facultyEmail)
+            .maybeSingle();
+
+    if (userError) {
+        console.error("Could not load faculty user:", userError);
+        return false;
+    }
+
+    if (!user) {
+        console.error("Faculty user not found:", facultyEmail);
+        return false;
+    }
+
+    const { data: mentor, error: mentorError } =
+        await window.supabaseClient
+            .from("mentor_profiles")
+            .select("*")
+            .eq("email", facultyEmail)
+            .maybeSingle();
+
+    if (mentorError) {
+        console.error(
+            "Could not load mentor profile:",
+            mentorError
+        );
+    }
+
+    facultyProfile = {
+        ...user,
+        ...(mentor || {})
+    };
+
+    facultyName =
+        facultyProfile.name ||
+        user.name ||
+        facultyEmail;
+
+    console.log(
+        "Faculty profile from Supabase:",
+        facultyProfile
+    );
+
+    console.log(
+        "Faculty name:",
+        facultyName
+    );
+
+    return true;
+}
 
 
 /* ======================================================
@@ -1481,14 +1553,27 @@ function renderAll() {
     renderNotifBadge();
 }
 
-renderProjectsChips();
-renderProjectsYearFilter();
-renderDiscoverChips();
-renderIdeasChips();
-renderReportsChips();
-renderUnmanagedFilters();
-renderProfile();
-renderAll();
+async function initializeFacultyDashboard() {
+    const profileLoaded = await loadFacultyProfile();
+
+    if (!profileLoaded) {
+        console.error(
+            "Faculty dashboard could not load the faculty profile."
+        );
+        return;
+    }
+
+    renderProjectsChips();
+    renderProjectsYearFilter();
+    renderDiscoverChips();
+    renderIdeasChips();
+    renderReportsChips();
+    renderUnmanagedFilters();
+    renderProfile();
+    renderAll();
+}
+
+initializeFacultyDashboard();
 
 
 /* ======================================================
