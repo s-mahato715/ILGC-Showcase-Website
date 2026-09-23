@@ -244,7 +244,11 @@ async function loadStudentProjects() {
 async function loadDiscoverProjects() {
     console.log("Loading Discover Projects from Supabase...");
 
-    const { data: projects, error } =
+    // --------------------------------------------------
+    // 1. LOAD PROJECTS
+    // --------------------------------------------------
+
+    const { data: projects, error: projectsError } =
         await window.supabaseClient
             .from("projects")
             .select(`
@@ -256,55 +260,211 @@ async function loadDiscoverProjects() {
                 status,
                 progress,
                 academic_year,
-                semester
+                semester,
+                domain_id
             `)
             .order("project_code");
 
-    if (error) {
+    if (projectsError) {
         console.error(
             "Could not load Discover Projects:",
-            error
+            projectsError
         );
+
         discoverProjects = [];
         return;
     }
 
-    console.log(
-        "Discover Projects from Supabase:",
-        projects
+    console.log("Projects from Supabase:", projects);
+
+    if (!projects || projects.length === 0) {
+        discoverProjects = [];
+        return;
+    }
+
+    const projectCodes = projects.map(
+        (project) => project.project_code
     );
 
-    discoverProjects = (projects || []).map((project) => ({
-        id: project.project_code,
-        projectCode: project.project_code,
+    // --------------------------------------------------
+    // 2. LOAD DOMAINS
+    // --------------------------------------------------
 
-        title: project.title,
+    const domainIds = [
+        ...new Set(
+            projects
+                .map((project) => project.domain_id)
+                .filter(Boolean)
+        )
+    ];
 
-        summary:
-            project.description ||
-            project.summary ||
-            "",
+    let domains = [];
 
-        expectedOutcome:
-            project.expected_outcome || "",
+    if (domainIds.length > 0) {
+        const { data: domainData, error: domainError } =
+            await window.supabaseClient
+                .from("project_domains")
+                .select("domain_id, name")
+                .in("domain_id", domainIds);
 
-        status:
-            project.status
-                ? project.status.charAt(0).toUpperCase() +
-                  project.status.slice(1)
-                : "Proposed",
+        if (domainError) {
+            console.error(
+                "Could not load project domains:",
+                domainError
+            );
+        } else {
+            domains = domainData || [];
+        }
+    }
 
-        progress: project.progress ?? 0,
+    console.log("Project domains from Supabase:", domains);
 
-        cohort: project.academic_year || "",
-        semester: project.semester || "",
+    const domainMap = new Map(
+        domains.map((domain) => [
+            domain.domain_id,
+            domain.name
+        ])
+    );
 
-        // We'll connect these to Supabase next.
-        domain: "",
-        mentor: "Faculty mentor",
+    // --------------------------------------------------
+    // 3. LOAD PROJECT MENTORS
+    // --------------------------------------------------
 
-        origin: "faculty"
-    }));
+    const { data: mentorAssignments, error: mentorError } =
+        await window.supabaseClient
+            .from("project_mentors")
+            .select(`
+                project_code,
+                mentor_email,
+                mentor_role
+            `)
+            .in("project_code", projectCodes);
+
+    if (mentorError) {
+        console.error(
+            "Could not load project mentors:",
+            mentorError
+        );
+    }
+
+    console.log(
+        "Project mentor assignments:",
+        mentorAssignments
+    );
+
+    const mentorEmails = [
+        ...new Set(
+            (mentorAssignments || [])
+                .map((mentor) => mentor.mentor_email)
+                .filter(Boolean)
+        )
+    ];
+
+    // --------------------------------------------------
+    // 4. LOAD MENTOR NAMES
+    // --------------------------------------------------
+
+    let mentors = [];
+
+    if (mentorEmails.length > 0) {
+        const { data: mentorUsers, error: mentorUsersError } =
+            await window.supabaseClient
+                .from("users")
+                .select("email, name")
+                .in("email", mentorEmails);
+
+        if (mentorUsersError) {
+            console.error(
+                "Could not load mentor names:",
+                mentorUsersError
+            );
+        } else {
+            mentors = mentorUsers || [];
+        }
+    }
+
+    console.log(
+        "Mentors from Supabase:",
+        mentors
+    );
+
+    const mentorMap = new Map(
+        mentors.map((mentor) => [
+            mentor.email,
+            mentor.name
+        ])
+    );
+
+    // --------------------------------------------------
+    // 5. COMBINE EVERYTHING
+    // --------------------------------------------------
+
+    discoverProjects = projects.map((project) => {
+
+        const projectMentors =
+            (mentorAssignments || [])
+                .filter(
+                    (assignment) =>
+                        assignment.project_code ===
+                        project.project_code
+                )
+                .map(
+                    (assignment) =>
+                        mentorMap.get(
+                            assignment.mentor_email
+                        ) || assignment.mentor_email
+                );
+
+        const mentorNames = [
+            ...new Set(
+                projectMentors.filter(Boolean)
+            )
+        ];
+
+        return {
+            id: project.project_code,
+
+            projectCode: project.project_code,
+
+            title: project.title,
+
+            summary:
+                project.description ||
+                project.summary ||
+                "",
+
+            expectedOutcome:
+                project.expected_outcome || "",
+
+            status:
+                project.status
+                    ? project.status.charAt(0).toUpperCase() +
+                      project.status.slice(1)
+                    : "Proposed",
+
+            progress: project.progress ?? 0,
+
+            cohort: project.academic_year || "",
+
+            semester: project.semester || "",
+
+            domain:
+                domainMap.get(project.domain_id) ||
+                "Other",
+
+            mentor:
+                mentorNames.length > 0
+                    ? mentorNames.join(", ")
+                    : "Faculty mentor",
+
+            origin: "faculty"
+        };
+    });
+
+    console.log(
+        "Final Discover Projects:",
+        discoverProjects
+    );
 }
 
 /* ======================================================
