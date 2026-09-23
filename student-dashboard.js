@@ -29,6 +29,7 @@ let studentSemester = "";
 let studentProgram = "";
 let studentDepartment = "";
 let studentRollNumber = "";
+let studentProjects = [];
 async function loadStudentProfile() {
     console.log("Loading student profile for:", userId);
 
@@ -80,6 +81,62 @@ async function loadStudentProfile() {
     }
 }
 
+async function loadStudentProjects() {
+    console.log("Loading projects for student:", userId);
+
+    const { data: memberships, error: membershipError } =
+        await window.supabaseClient
+            .from("project_members")
+            .select(`
+                project_code,
+                student_email,
+                member_role,
+                joined_at,
+                left_at
+            `)
+            .eq("student_email", userId)
+            .is("left_at", null);
+
+    if (membershipError) {
+        console.error("Could not load student project memberships:", membershipError);
+        return [];
+    }
+
+    console.log("Student project memberships:", memberships);
+
+    if (!memberships || memberships.length === 0) {
+        return [];
+    }
+
+    const projectCodes = [
+        ...new Set(memberships.map((m) => m.project_code))
+    ];
+
+    const { data: projects, error: projectsError } =
+        await window.supabaseClient
+            .from("projects")
+            .select(`
+                project_code,
+                title,
+                description,
+                summary,
+                expected_outcome,
+                status,
+                progress,
+                academic_year,
+                semester
+            `)
+            .in("project_code", projectCodes);
+
+    if (projectsError) {
+        console.error("Could not load student projects:", projectsError);
+        return [];
+    }
+
+    console.log("Student projects from Supabase:", projects);
+
+    return projects || [];
+}
 
 /* ======================================================
    INTERESTS STORAGE
@@ -1089,6 +1146,9 @@ renderIdeasScopeChips();
 renderProfile();
 async function initStudentDashboard() {
     await loadStudentProfile();
+
+    studentProjects = await loadStudentProjects();
+
     renderAll();
 }
 
