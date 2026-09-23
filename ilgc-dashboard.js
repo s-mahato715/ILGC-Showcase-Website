@@ -55,7 +55,9 @@ let mentorGroups = [];
 async function loadMentorGroups() {
     console.log("Loading groups for mentor:", userId);
 
-    // 1. Find projects assigned to the logged-in mentor
+    // --------------------------------------------------
+    // 1. Get projects assigned to this mentor
+    // --------------------------------------------------
     const { data: mentorProjects, error: mentorProjectsError } =
         await window.supabaseClient
             .from("project_mentors")
@@ -63,7 +65,10 @@ async function loadMentorGroups() {
             .eq("mentor_email", userId);
 
     if (mentorProjectsError) {
-        console.error("Could not load mentor projects:", mentorProjectsError);
+        console.error(
+            "Could not load mentor projects:",
+            mentorProjectsError
+        );
         mentorGroups = [];
         return;
     }
@@ -79,7 +84,39 @@ async function loadMentorGroups() {
         return;
     }
 
-    // 2. Find ACTIVE students in those projects
+    // --------------------------------------------------
+    // 2. Get project details from projects table
+    // --------------------------------------------------
+    const { data: projects, error: projectsError } =
+        await window.supabaseClient
+            .from("projects")
+            .select(`
+                project_code,
+                title,
+                description,
+                summary,
+                expected_outcome,
+                status,
+                progress,
+                academic_year,
+                semester
+            `)
+            .in("project_code", projectCodes);
+
+    if (projectsError) {
+        console.error(
+            "Could not load project details:",
+            projectsError
+        );
+        mentorGroups = [];
+        return;
+    }
+
+    console.log("Mentor project details:", projects);
+
+    // --------------------------------------------------
+    // 3. Get students belonging to those projects
+    // --------------------------------------------------
     const { data: members, error: membersError } =
         await window.supabaseClient
             .from("project_members")
@@ -96,7 +133,10 @@ async function loadMentorGroups() {
             .order("student_email");
 
     if (membersError) {
-        console.error("Could not load project members:", membersError);
+        console.error(
+            "Could not load project members:",
+            membersError
+        );
         mentorGroups = [];
         return;
     }
@@ -108,7 +148,9 @@ async function loadMentorGroups() {
         return;
     }
 
-    // 3. Get student names from users
+    // --------------------------------------------------
+    // 4. Get student names
+    // --------------------------------------------------
     const studentEmails = [
         ...new Set(
             members.map((member) => member.student_email)
@@ -122,7 +164,10 @@ async function loadMentorGroups() {
             .in("email", studentEmails);
 
     if (studentsError) {
-        console.error("Could not load student names:", studentsError);
+        console.error(
+            "Could not load student names:",
+            studentsError
+        );
         mentorGroups = [];
         return;
     }
@@ -136,17 +181,54 @@ async function loadMentorGroups() {
         ])
     );
 
-    // 4. Group students by project
+    // --------------------------------------------------
+    // 5. Create lookup for project details
+    // --------------------------------------------------
+    const projectMap = new Map(
+        (projects || []).map((project) => [
+            project.project_code,
+            project
+        ])
+    );
+
+    // --------------------------------------------------
+    // 6. Build final mentor groups
+    // --------------------------------------------------
     const groupsMap = new Map();
 
     members.forEach((member) => {
         if (!groupsMap.has(member.project_code)) {
-            groupsMap.set(member.project_code, []);
+            const project = projectMap.get(member.project_code);
+
+            groupsMap.set(member.project_code, {
+                projectCode: member.project_code,
+
+                title:
+                    project?.title ||
+                    `Project ${member.project_code}`,
+
+                description:
+                    project?.description ||
+                    project?.summary ||
+                    "",
+
+                status: project?.status || "proposed",
+
+                progress: project?.progress ?? 0,
+
+                academicYear:
+                    project?.academic_year || "",
+
+                semester:
+                    project?.semester || null,
+
+                students: []
+            });
         }
 
         const student = studentMap.get(member.student_email);
 
-        groupsMap.get(member.project_code).push({
+        groupsMap.get(member.project_code).students.push({
             email: member.student_email,
             name: student?.name || member.student_email,
             role: member.member_role,
@@ -154,13 +236,7 @@ async function loadMentorGroups() {
         });
     });
 
-    // 5. ONLY keep projects that actually have students
-    mentorGroups = Array.from(groupsMap.entries()).map(
-        ([projectCode, students]) => ({
-            projectCode,
-            students
-        })
-    );
+    mentorGroups = Array.from(groupsMap.values());
 
     console.log("Final mentor groups:", mentorGroups);
 }
@@ -451,11 +527,14 @@ function renderGroups() {
     empty.classList.add("hidden");
 
     grid.innerHTML = mentorGroups.map((group) => {
+
         const studentsHtml = group.students.map((student) => {
-            const initial = (student.name || "?").charAt(0).toUpperCase();
+            const initial =
+                (student.name || "?").charAt(0).toUpperCase();
 
             return `
                 <div class="student-row">
+
                     <div class="student-avatar">
                         ${initial}
                     </div>
@@ -464,32 +543,60 @@ function renderGroups() {
                         <strong>${student.name}</strong>
                         <span>${student.email}</span>
                     </div>
+
                 </div>
             `;
         }).join("");
+
+        const status =
+            String(group.status || "proposed")
+                .charAt(0)
+                .toUpperCase() +
+            String(group.status || "proposed").slice(1);
 
         return `
             <article class="group-card mentor-project-card">
 
                 <div class="group-card-top">
+
                     <span class="project-code">
                         ${group.projectCode}
                     </span>
 
                     <span class="badge badge-ongoing">
-                        ${group.students.length}
-                        student${group.students.length !== 1 ? "s" : ""}
+                        ${status}
                     </span>
+
                 </div>
 
                 <div class="group-card-body">
 
                     <h3 class="group-title">
-                        Project ${group.projectCode}
+                        ${group.title}
                     </h3>
 
+                    ${
+                        group.academicYear
+                            ? `
+                                <p class="project-meta">
+                                    ${group.academicYear}
+                                </p>
+                              `
+                            : ""
+                    }
+
+                    ${
+                        group.description
+                            ? `
+                                <p class="project-description">
+                                    ${group.description}
+                                </p>
+                              `
+                            : ""
+                    }
+
                     <div class="students-heading">
-                        <span>STUDENTS (${group.students.length})</span>
+                        STUDENTS (${group.students.length})
                     </div>
 
                     <div class="student-list">
