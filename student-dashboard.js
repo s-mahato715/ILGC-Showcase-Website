@@ -24,7 +24,8 @@ if (!loggedIn || role !== "student" || !userId) {
    STUDENT PROFILE (derived — see data.js)
 ====================================================== */
 
-const { name: studentName, semester: studentSemester } = deriveStudentProfile(userId);
+let studentName = "Student";
+let studentSemester = "";
 
 
 /* ======================================================
