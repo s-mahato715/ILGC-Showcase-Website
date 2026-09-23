@@ -325,6 +325,13 @@ async function loadDiscoverProjects() {
             domain.name
         ])
     );
+   DOMAINS = [
+    "All",
+    ...domains
+        .map((domain) => domain.name)
+        .filter(Boolean)
+        .sort()
+];
 
     // --------------------------------------------------
     // 3. LOAD PROJECT MENTORS
@@ -604,13 +611,7 @@ document.getElementById("logoutBtnProfile").addEventListener("click", logout);
 ====================================================== */
 
 const STATUSES = ["All", "Ongoing", "Proposed", "Completed"];
-const DOMAINS = [
-    "All",
-    "AI / Machine Learning",
-    "Robotics & Embedded Systems",
-    "Sustainability",
-    "Healthcare Tech"
-];
+let DOMAINS = ["All"];
 
 let activeStatus = "All";
 let activeDomain = "All";
@@ -618,26 +619,44 @@ let activeMentor = "All";
 let searchTerm = "";
 
 function matchesFilters(project) {
+    const projectStatus =
+        String(project.status || "").trim().toLowerCase();
+
+    const selectedStatus =
+        String(activeStatus || "").trim().toLowerCase();
+
+    const projectDomain =
+        String(project.domain || "").trim().toLowerCase();
+
+    const selectedDomain =
+        String(activeDomain || "").trim().toLowerCase();
+
+    const projectMentor =
+        String(project.mentor || "").trim().toLowerCase();
+
+    const selectedMentor =
+        String(activeMentor || "").trim().toLowerCase();
+
     const statusMatch =
         activeStatus === "All" ||
-        project.status === activeStatus;
+        projectStatus === selectedStatus;
 
     const domainMatch =
         activeDomain === "All" ||
-        project.domain === activeDomain;
+        projectDomain === selectedDomain;
 
     const mentorMatch =
         activeMentor === "All" ||
-        project.mentor === activeMentor;
+        projectMentor === selectedMentor;
 
     const term = searchTerm.toLowerCase();
 
     const searchMatch =
         !term ||
-        (project.title || "").toLowerCase().includes(term) ||
-        (project.summary || "").toLowerCase().includes(term) ||
-        (project.domain || "").toLowerCase().includes(term) ||
-        (project.mentor || "").toLowerCase().includes(term);
+        String(project.title || "").toLowerCase().includes(term) ||
+        String(project.summary || "").toLowerCase().includes(term) ||
+        String(project.domain || "").toLowerCase().includes(term) ||
+        String(project.mentor || "").toLowerCase().includes(term);
 
     return (
         statusMatch &&
