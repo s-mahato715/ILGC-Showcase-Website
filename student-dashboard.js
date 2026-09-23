@@ -12,97 +12,10 @@ if (!loggedIn || role !== "student" || !userId) {
 
 
 /* ======================================================
-   STUDENT PROFILE
-   Loaded from Supabase users table
+   STUDENT PROFILE (derived — see data.js)
 ====================================================== */
 
-let studentName = userId;
-let studentSemester = "";
-
-async function loadStudentProfile() {
-    const { data, error } = await window.supabaseClient
-        .from("users")
-        .select("name")
-        .eq("email", userId)
-        .maybeSingle();
-
-    if (error) {
-        console.error("Student profile error:", error);
-        studentName = userId;
-        return;
-    }
-
-    studentName = data?.name || userId;
-}
-
-
-/* ======================================================
-   ENROLLED PROJECTS
-   Source of truth:
-   project_members.student_email -> project_code
-   projects.project_code -> project details
-====================================================== */
-
-let enrolledProjects = [];
-
-async function loadEnrolledProjects() {
-    enrolledProjects = [];
-
-    // First get the projects this student belongs to
-    const { data: memberships, error: membershipError } =
-        await window.supabaseClient
-            .from("project_members")
-            .select("project_code, student_email, member_role, joined_at, left_at")
-            .eq("student_email", userId)
-            .is("left_at", null);
-
-    if (membershipError) {
-        console.error("Project membership error:", membershipError);
-        return;
-    }
-
-    if (!memberships || memberships.length === 0) {
-        return;
-    }
-
-    const projectCodes = [
-        ...new Set(
-            memberships
-                .map((member) => member.project_code)
-                .filter(Boolean)
-        )
-    ];
-
-    if (projectCodes.length === 0) {
-        return;
-    }
-
-    // Now fetch the actual project details
-    const { data: projects, error: projectsError } =
-        await window.supabaseClient
-            .from("projects")
-            .select("*")
-            .in("project_code", projectCodes);
-
-    if (projectsError) {
-        console.error("Projects fetch error:", projectsError);
-        return;
-    }
-
-    enrolledProjects = (projects || []).map((project) => {
-        const membership = memberships.find(
-            (member) => member.project_code === project.project_code
-        );
-
-        return {
-            ...project,
-            memberRole: membership?.member_role || "",
-            joinedAt: membership?.joined_at || null
-        };
-    });
-
-    console.log("Enrolled projects:", enrolledProjects);
-}
+const { name: studentName, semester: studentSemester } = deriveStudentProfile(userId);
 
 
 /* ======================================================
@@ -154,18 +67,18 @@ function simulateFacultyResponse(projectId) {
 
 
 /* ======================================================
-   MY PROJECTS
-   Based on project_members, NOT localStorage interests
+   MY PROJECT (derived from an accepted interest)
 ====================================================== */
 
 function getMyProject() {
-    return enrolledProjects.length > 0
-        ? enrolledProjects[0]
-        : null;
+    const accepted = interests.find((i) => i.status === "Accepted");
+    if (!accepted) return null;
+    return getAllProjects().find((p) => p.id === accepted.projectId) || null;
 }
 
 function getMyProjects() {
-    return enrolledProjects;
+    const acceptedIds = interests.filter((i) => i.status === "Accepted").map((i) => i.projectId);
+    return getAllProjects().filter((p) => acceptedIds.includes(p.id));
 }
 
 
@@ -292,8 +205,7 @@ function interestBadgeClass(status) {
 
 function renderHome() {
     document.getElementById("greetingText").textContent = `Hi, ${studentName} 👋`;
-    document.getElementById("greetingSub").textContent =
-    `${userId}`;
+    document.getElementById("greetingSub").textContent = `Semester ${studentSemester} · ${cohortCodeFromSemester(studentSemester)} · ${userId}`;
 
     const myProject = getMyProject();
     const pendingCount = interests.filter((i) => i.status === "Pending").length;
@@ -586,7 +498,7 @@ function sharePointHtml(project) {
 function myProjectFullCardHtml(project) {
     const teammates = (project.team || []).filter((m) => m.name !== studentName);
     const teamHtml = teammates.length
-        ? `<div class="modal-team">${teammates.map((m) => `<span class="team-chip">${m.name} · Sem ${m.semester} ·${yearFromSemester(m.semester)}</span>`).join("")}</div>`
+        ? `<div class="modal-team">${teammates.map((m) => `<span class="team-chip">${m.name} · Sem ${m.semester} · ${yearFromSemester(m.semester)}</span>`).join("")}</div>`
         : `<p class="empty-panel">You're the only student on this project so far.</p>`;
 
     return `
@@ -666,7 +578,7 @@ function openModal(projectId) {
     if (!project) return;
 
     const teamHtml = project.team.length
-        ? `<div class="modal-team">${project.team.map((m) => `<span class="team-chip">${m.name} · Sem ${m.semester} ·${yearFromSemester(m.semester)}</span>`).join("")}</div>`
+        ? `<div class="modal-team">${project.team.map((m) => `<span class="team-chip">${m.name} · Sem ${m.semester} · ${yearFromSemester(m.semester)}</span>`).join("")}</div>`
         : `<p class="modal-text">No students assigned to this project yet.</p>`;
 
     const profEmail = facultyEmail(project.mentor);
@@ -1109,17 +1021,10 @@ function renderAll() {
     renderNotifBadge();
 }
 
-async function initDashboard() {
-    await loadStudentProfile();
-    await loadEnrolledProjects();
-
-    renderDiscoverChips();
-    renderIdeasScopeChips();
-    renderProfile();
-    renderAll();
-}
-
-initDashboard();
+renderDiscoverChips();
+renderIdeasScopeChips();
+renderProfile();
+renderAll();
 
 
 /* ======================================================
