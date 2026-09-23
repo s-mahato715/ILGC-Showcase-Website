@@ -5,6 +5,15 @@
 const role = localStorage.getItem("selectedRole");
 const loggedIn = localStorage.getItem("loggedIn");
 const userId = localStorage.getItem("userId");
+/* ======================================================
+   SUPABASE
+====================================================== */
+
+if (!window.supabaseClient) {
+    console.error("Supabase client is not loaded.");
+} else {
+    console.log("Student dashboard: Supabase connected.");
+}
 
 if (!loggedIn || role !== "student" || !userId) {
     window.location.href = "login.html";
