@@ -1,9 +1,11 @@
 /* ======================================================
-   AUTH GUARD
+   ILGC FACULTY DASHBOARD
+   Supabase-backed version
 ====================================================== */
 
+
 /* ======================================================
-   SUPABASE + AUTH
+   AUTH
 ====================================================== */
 
 const role = localStorage.getItem("selectedRole");
@@ -20,10 +22,44 @@ let facultyEmail = userId;
 
 
 /* ======================================================
-   LOAD FACULTY PROFILE FROM SUPABASE
+   SUPABASE
+====================================================== */
+
+if (!window.supabaseClient) {
+    console.error("Supabase client is not available.");
+} else {
+    console.log("Faculty dashboard: Supabase connected.");
+}
+
+
+/* ======================================================
+   STATE
+====================================================== */
+
+let myProjectsData = [];
+let allProjectsData = [];
+let interestedStudentsData = [];
+let studentProfilesData = [];
+
+let projectsActiveStatus = "All";
+let projectsActiveSemester = "All";
+
+let discoverStatus = "All";
+let discoverDomain = "All";
+let discoverMentor = "All";
+let discoverSearch = "";
+
+let studentsActiveStatus = "All";
+
+let toastTimer = null;
+
+
+/* ======================================================
+   FACULTY PROFILE
 ====================================================== */
 
 async function loadFacultyProfile() {
+
     if (!window.supabaseClient) {
         console.error("Supabase client is not available.");
         return false;
@@ -68,7 +104,7 @@ async function loadFacultyProfile() {
     };
 
     facultyName =
-        facultyProfile.name ||
+        mentor?.name ||
         user.name ||
         facultyEmail;
 
@@ -87,107 +123,546 @@ async function loadFacultyProfile() {
 
 
 /* ======================================================
-   DATA HELPERS
+   LOAD PROJECTS
 ====================================================== */
 
-function myProjects() {
-    return getAllProjects().filter((p) => p.mentor === facultyName);
+async function loadAllProjects() {
+
+    const { data, error } =
+        await window.supabaseClient
+            .from("projects")
+            .select(`
+                project_code,
+                title,
+                description,
+                summary,
+                expected_outcome,
+                status,
+                progress,
+                academic_year,
+                semester
+            `)
+            .order("project_code");
+
+    if (error) {
+        console.error(
+            "Could not load projects:",
+            error
+        );
+
+        return [];
+    }
+
+    return data || [];
 }
 
-function interestsForMyProjects() {
-    const myIds = new Set(myProjects().map((p) => p.id));
-    return getAllInterestsAcrossStudents().filter((i) => myIds.has(i.projectId));
+
+/* ======================================================
+   LOAD MY PROJECTS
+====================================================== */
+
+async function loadMyProjects() {
+
+    const { data: assignments, error: assignmentError } =
+        await window.supabaseClient
+            .from("project_mentors")
+            .select(`
+                project_code,
+                mentor_email,
+                mentor_role
+            `)
+            .eq("mentor_email", facultyEmail);
+
+    if (assignmentError) {
+        console.error(
+            "Could not load faculty project assignments:",
+            assignmentError
+        );
+
+        return [];
+    }
+
+    if (!assignments || assignments.length === 0) {
+        console.log("No projects assigned to faculty.");
+        return [];
+    }
+
+    const projectCodes = [
+        ...new Set(
+            assignments
+                .map((row) => row.project_code)
+                .filter(Boolean)
+        )
+    ];
+
+    const { data: projects, error: projectError } =
+        await window.supabaseClient
+            .from("projects")
+            .select(`
+                project_code,
+                title,
+                description,
+                summary,
+                expected_outcome,
+                status,
+                progress,
+                academic_year,
+                semester
+            `)
+            .in("project_code", projectCodes)
+            .order("project_code");
+
+    if (projectError) {
+        console.error(
+            "Could not load faculty projects:",
+            projectError
+        );
+
+        return [];
+    }
+
+    return projects || [];
 }
 
-function pendingCountFor(projectId) {
-    return getAllInterestsAcrossStudents().filter(
-        (i) => i.projectId === projectId && i.status === "Pending"
-    ).length;
+
+/* ======================================================
+   LOAD PROJECT MEMBERS
+====================================================== */
+
+async function loadInterestedStudents() {
+
+    if (!myProjectsData.length) {
+        return [];
+    }
+
+    const projectCodes =
+        myProjectsData.map(
+            (project) => project.project_code
+        );
+
+    const { data: members, error } =
+        await window.supabaseClient
+            .from("project_members")
+            .select(`
+                project_code,
+                student_email,
+                member_role,
+                joined_at,
+                left_at
+            `)
+            .in("project_code", projectCodes);
+
+    if (error) {
+        console.error(
+            "Could not load project members:",
+            error
+        );
+
+        return [];
+    }
+
+    if (!members || members.length === 0) {
+        return [];
+    }
+
+    const studentEmails = [
+        ...new Set(
+            members
+                .map((member) => member.student_email)
+                .filter(Boolean)
+        )
+    ];
+
+    const { data: students, error: studentError } =
+        await window.supabaseClient
+            .from("student_profiles")
+            .select("*")
+            .in("email", studentEmails);
+
+    if (studentError) {
+        console.error(
+            "Could not load student profiles:",
+            studentError
+        );
+
+        return [];
+    }
+
+    studentProfilesData = students || [];
+
+    return members.map((member) => {
+
+        const student =
+            studentProfilesData.find(
+                (profile) =>
+                    profile.email === member.student_email
+            );
+
+        const project =
+            myProjectsData.find(
+                (p) =>
+                    p.project_code === member.project_code
+            );
+
+        return {
+            ...member,
+            student,
+            project
+        };
+
+    });
 }
+
+
+/* ======================================================
+   HELPERS
+====================================================== */
+
+function getStudentName(student) {
+
+    if (!student) {
+        return "Unknown student";
+    }
+
+    return (
+        student.name ||
+        student.full_name ||
+        student.email ||
+        "Unknown student"
+    );
+}
+
+
+function getSemester(student) {
+
+    if (!student) {
+        return "—";
+    }
+
+    return student.semester ??
+        student.sem ??
+        "—";
+}
+
+
+function getProjectStatus(project) {
+
+    const status =
+        String(project.status || "")
+            .trim();
+
+    if (!status) {
+        return "Proposed";
+    }
+
+    return (
+        status.charAt(0).toUpperCase() +
+        status.slice(1)
+    );
+}
+
+
+function projectDomain(project) {
+
+    if (
+        project.domains &&
+        Array.isArray(project.domains) &&
+        project.domains.length
+    ) {
+        return project.domains.join(" · ");
+    }
+
+    return "Other";
+}
+
 
 function statusBadgeClass(status) {
-    if (status === "Ongoing") return "badge-ongoing";
-    if (status === "Proposed") return "badge-proposed";
-    if (status === "Completed") return "badge-completed";
+
+    if (status === "Ongoing") {
+        return "badge-ongoing";
+    }
+
+    if (status === "Proposed") {
+        return "badge-proposed";
+    }
+
+    if (status === "Completed") {
+        return "badge-completed";
+    }
+
     return "";
 }
 
-function interestBadgeClass(status) {
-    if (status === "Pending") return "badge-pending";
-    if (status === "Accepted") return "badge-accepted";
-    if (status === "Rejected") return "badge-rejected";
-    return "";
+
+/* ======================================================
+   DOMAIN LOADING
+====================================================== */
+
+async function loadProjectDomains(projects) {
+
+    if (!projects.length) {
+        return projects;
+    }
+
+    const projectCodes =
+        projects.map(
+            (project) => project.project_code
+        );
+
+    const { data: mappings, error: mappingError } =
+        await window.supabaseClient
+            .from("project_domain_map")
+            .select("project_code, domain_id")
+            .in("project_code", projectCodes);
+
+    if (mappingError) {
+        console.error(
+            "Could not load project-domain mappings:",
+            mappingError
+        );
+
+        return projects;
+    }
+
+    if (!mappings || !mappings.length) {
+        return projects.map((project) => ({
+            ...project,
+            domains: []
+        }));
+    }
+
+    const domainIds = [
+        ...new Set(
+            mappings
+                .map((mapping) => mapping.domain_id)
+                .filter(Boolean)
+        )
+    ];
+
+    const { data: domains, error: domainError } =
+        await window.supabaseClient
+            .from("project_domains")
+            .select("domain_id, name")
+            .in("domain_id", domainIds);
+
+    if (domainError) {
+        console.error(
+            "Could not load project domains:",
+            domainError
+        );
+
+        return projects;
+    }
+
+    const domainMap = new Map(
+        (domains || []).map(
+            (domain) => [
+                domain.domain_id,
+                domain.name
+            ]
+        )
+    );
+
+    const projectDomainMap = new Map();
+
+    mappings.forEach((mapping) => {
+
+        const name =
+            domainMap.get(mapping.domain_id);
+
+        if (!name) {
+            return;
+        }
+
+        if (
+            !projectDomainMap.has(
+                mapping.project_code
+            )
+        ) {
+            projectDomainMap.set(
+                mapping.project_code,
+                []
+            );
+        }
+
+        projectDomainMap
+            .get(mapping.project_code)
+            .push(name);
+    });
+
+    return projects.map((project) => ({
+        ...project,
+        domains:
+            projectDomainMap.get(
+                project.project_code
+            ) || []
+    }));
 }
 
-const FORM_DOMAINS = [
-    "AI / Machine Learning",
-    "Robotics & Embedded Systems",
-    "Sustainability",
-    "Healthcare Tech"
-];
 
-const FORM_STATUSES = ["Ongoing", "Proposed", "Completed"];
-const IDEA_STATUSES = ["Pending", "Accepted", "Rejected", "Needs Revision"];
-const REPORT_STATUSES = ["Submitted", "Under Review", "Changes Requested", "Resubmitted", "Approved"];
-const REPORT_TIMELINE = ["Submitted", "Under Review", "Changes Requested", "Resubmitted", "Approved"];
+/* ======================================================
+   PROJECT MENTORS
+====================================================== */
 
-function ideaBadgeClass(status) {
-    if (status === "Pending") return "badge-pending";
-    if (status === "Accepted") return "badge-accepted";
-    if (status === "Rejected") return "badge-rejected";
-    if (status === "Needs Revision") return "badge-proposed";
-    return "";
+async function loadProjectMentors(projects) {
+
+    if (!projects.length) {
+        return projects;
+    }
+
+    const projectCodes =
+        projects.map(
+            (project) => project.project_code
+        );
+
+    const { data: assignments, error } =
+        await window.supabaseClient
+            .from("project_mentors")
+            .select(`
+                project_code,
+                mentor_email,
+                mentor_role
+            `)
+            .in("project_code", projectCodes);
+
+    if (error) {
+        console.error(
+            "Could not load project mentors:",
+            error
+        );
+
+        return projects;
+    }
+
+    if (!assignments || !assignments.length) {
+        return projects.map((project) => ({
+            ...project,
+            mentors: []
+        }));
+    }
+
+    const mentorEmails = [
+        ...new Set(
+            assignments
+                .map(
+                    (row) =>
+                        row.mentor_email
+                )
+                .filter(Boolean)
+        )
+    ];
+
+    const { data: users, error: userError } =
+        await window.supabaseClient
+            .from("users")
+            .select("email, name")
+            .in("email", mentorEmails);
+
+    if (userError) {
+        console.error(
+            "Could not load mentor names:",
+            userError
+        );
+
+        return projects;
+    }
+
+    const mentorMap = new Map(
+        (users || []).map(
+            (user) => [
+                user.email,
+                user.name || user.email
+            ]
+        )
+    );
+
+    const mentorProjectMap = new Map();
+
+    assignments.forEach((assignment) => {
+
+        const mentorName =
+            mentorMap.get(
+                assignment.mentor_email
+            ) ||
+            assignment.mentor_email;
+
+        if (
+            !mentorProjectMap.has(
+                assignment.project_code
+            )
+        ) {
+            mentorProjectMap.set(
+                assignment.project_code,
+                []
+            );
+        }
+
+        mentorProjectMap
+            .get(assignment.project_code)
+            .push(mentorName);
+    });
+
+    return projects.map((project) => ({
+        ...project,
+        mentors:
+            mentorProjectMap.get(
+                project.project_code
+            ) || []
+    }));
 }
 
-function reportBadgeClass(status) {
-    const map = {
-        "Submitted": "badge-submitted",
-        "Under Review": "badge-underreview",
-        "Changes Requested": "badge-changesrequested",
-        "Resubmitted": "badge-resubmitted",
-        "Approved": "badge-approved"
+
+/* ======================================================
+   NORMALIZE PROJECT
+====================================================== */
+
+function normalizeProject(project) {
+
+    return {
+        id: project.project_code,
+        projectCode: project.project_code,
+        title:
+            project.title ||
+            "Untitled Project",
+
+        summary:
+            project.description ||
+            project.summary ||
+            "",
+
+        expectedOutcome:
+            project.expected_outcome ||
+            "",
+
+        status:
+            getProjectStatus(project),
+
+        progress:
+            Number(project.progress || 0),
+
+        cohort:
+            project.academic_year ||
+            "",
+
+        semester:
+            project.semester ||
+            "",
+
+        domains:
+            project.domains || [],
+
+        domain:
+            projectDomain(project),
+
+        mentors:
+            project.mentors || [],
+
+        mentor:
+            project.mentors &&
+            project.mentors.length
+                ? project.mentors.join(", ")
+                : "Faculty mentor"
     };
-    return map[status] || "";
-}
-
-function myIdeas() {
-    return getAllIdeas().filter((i) => i.targetMentor === facultyName);
-}
-
-function myReports() {
-    const myIds = new Set(myProjects().map((p) => p.id));
-    return getAllReports().filter((r) => myIds.has(r.projectId));
-}
-
-/* Read-only view of a project's student-created SharePoint workspace,
-   used inside the faculty/mentor project detail modal. */
-function sharePointViewHtml(projectId) {
-    const sp = getSharePoint(projectId);
-
-    if (!sp) {
-        return `<p class="modal-text">The team hasn't created a SharePoint workspace for this project yet.</p>`;
-    }
-
-    if (!sp.files.length) {
-        return `<p class="modal-text">SharePoint created, but no reports have been posted yet.</p>`;
-    }
-
-    return `<div class="sp-view-list">${sp.files.map((f) => {
-        const date = new Date(f.addedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-        const linkHtml = f.link
-            ? `<a class="sp-view-link" href="${f.link}" target="_blank" rel="noopener">Open report ↗</a>`
-            : `<span class="sp-view-nolink">No file link</span>`;
-        return `
-            <div class="sp-view-item">
-                <div>
-                    <p class="sp-view-title">${f.title}</p>
-                    ${f.note ? `<p class="sp-view-note">${f.note}</p>` : ""}
-                    <p class="sp-view-meta">Added by ${f.addedBy} · ${date}</p>
-                </div>
-                ${linkHtml}
-            </div>
-        `;
-    }).join("")}</div>`;
 }
 
 
@@ -195,14 +670,28 @@ function sharePointViewHtml(projectId) {
    TOAST
 ====================================================== */
 
-let toastTimer = null;
-
 function showToast(message) {
-    const toast = document.getElementById("toast");
+
+    const toast =
+        document.getElementById("toast");
+
+    if (!toast) {
+        return;
+    }
+
     toast.textContent = message;
     toast.classList.remove("hidden");
+
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toast.classList.add("hidden"), 2600);
+
+    toastTimer =
+        setTimeout(
+            () =>
+                toast.classList.add(
+                    "hidden"
+                ),
+            2600
+        );
 }
 
 
@@ -210,28 +699,82 @@ function showToast(message) {
    TABS
 ====================================================== */
 
-const tabButtons = document.querySelectorAll(".tab");
-const views = document.querySelectorAll(".view");
-const notifBtn = document.getElementById("notifBtn");
+const tabButtons =
+    document.querySelectorAll(".tab");
+
+const views =
+    document.querySelectorAll(".view");
+
+const notifBtn =
+    document.getElementById("notifBtn");
+
 
 function goToTab(tabName) {
-    tabButtons.forEach((btn) => {
-        btn.dataset.active = String(btn.dataset.tab === tabName);
+
+    tabButtons.forEach((button) => {
+
+        button.dataset.active =
+            String(
+                button.dataset.tab ===
+                tabName
+            );
     });
+
     views.forEach((view) => {
-        view.dataset.active = String(view.id === `view-${tabName}`);
+
+        view.dataset.active =
+            String(
+                view.id ===
+                `view-${tabName}`
+            );
     });
+
     if (notifBtn) {
-        notifBtn.dataset.active = String(tabName === "notifications");
+
+        notifBtn.dataset.active =
+            String(
+                tabName ===
+                "notifications"
+            );
     }
 }
 
-tabButtons.forEach((btn) => btn.addEventListener("click", () => goToTab(btn.dataset.tab)));
-document.querySelectorAll("[data-goto]").forEach((btn) => {
-    btn.addEventListener("click", () => goToTab(btn.dataset.goto));
+
+tabButtons.forEach((button) => {
+
+    button.addEventListener(
+        "click",
+        () =>
+            goToTab(
+                button.dataset.tab
+            )
+    );
 });
+
+
+document
+    .querySelectorAll("[data-goto]")
+    .forEach((button) => {
+
+        button.addEventListener(
+            "click",
+            () =>
+                goToTab(
+                    button.dataset.goto
+                )
+        );
+    });
+
+
 if (notifBtn) {
-    notifBtn.addEventListener("click", () => goToTab(notifBtn.dataset.tab));
+
+    notifBtn.addEventListener(
+        "click",
+        () =>
+            goToTab(
+                notifBtn.dataset.tab
+            )
+    );
 }
 
 
@@ -240,1147 +783,1323 @@ if (notifBtn) {
 ====================================================== */
 
 function logout() {
+
     localStorage.removeItem("loggedIn");
     localStorage.removeItem("userId");
     localStorage.removeItem("selectedRole");
-    window.location.href = "index.html";
+
+    window.location.href =
+        "index.html";
 }
 
-document.getElementById("logoutBtn").addEventListener("click", logout);
-document.getElementById("logoutBtnProfile").addEventListener("click", logout);
+
+document
+    .getElementById("logoutBtn")
+    ?.addEventListener(
+        "click",
+        logout
+    );
+
+document
+    .getElementById("logoutBtnProfile")
+    ?.addEventListener(
+        "click",
+        logout
+    );
 
 
 /* ======================================================
-   PROJECT CARD (shared markup for Home + My Projects)
+   PROJECT CARD
 ====================================================== */
 
 function projectCardHtml(project) {
-    const teamCount = (project.team || []).length;
-    const pending = pendingCountFor(project.id);
+
+    const members =
+        interestedStudentsData.filter(
+            (member) =>
+                member.project_code ===
+                project.id
+        );
 
     return `
         <article class="project-card">
+
             <div class="project-card-top">
-                <span class="project-domain">${project.domain}</span>
-                <span class="badge ${statusBadgeClass(project.status)}">${project.status}</span>
+
+                <span class="project-domain">
+                    ${project.domain}
+                </span>
+
+                <span class="badge ${statusBadgeClass(project.status)}">
+                    ${project.status}
+                </span>
+
             </div>
+
             <div class="project-card-body">
-                <h3 class="project-title" data-open="${project.id}">${project.title}</h3>
+
+                <h3
+                    class="project-title"
+                    data-open="${project.id}"
+                >
+                    ${project.title}
+                </h3>
+
                 <div class="progress-track">
-                    <div class="progress-fill" style="width:${project.progress}%"></div>
+                    <div
+                        class="progress-fill"
+                        style="width:${project.progress}%"
+                    ></div>
                 </div>
-                <p class="progress-label" style="margin-bottom:14px;">${project.progress}% complete</p>
+
+                <p
+                    class="progress-label"
+                    style="margin-bottom:14px;"
+                >
+                    ${project.progress}% complete
+                </p>
+
                 <div class="project-card-stats">
-                    <span class="project-card-stat"><strong>${teamCount}</strong> team member${teamCount !== 1 ? "s" : ""}</span>
-                    <span class="project-card-stat"><strong>${pending}</strong> interested</span>
+
+                    <span class="project-card-stat">
+                        <strong>
+                            ${members.length}
+                        </strong>
+                        student${members.length !== 1 ? "s" : ""}
+                    </span>
+
+                    <span class="project-card-stat">
+                        <strong>
+                            ${project.semester || "—"}
+                        </strong>
+                        semester
+                    </span>
+
                 </div>
+
                 <div class="project-card-actions">
-                    <button class="btn btn-secondary" data-edit="${project.id}">Edit</button>
-                    <button class="btn btn-primary" data-open="${project.id}">Details</button>
-                    <button class="btn btn-danger btn-icon" data-delete="${project.id}" title="Delete project" aria-label="Delete project">🗑</button>
+
+                    <button
+                        class="btn btn-primary"
+                        data-open="${project.id}"
+                    >
+                        Details
+                    </button>
+
                 </div>
+
             </div>
+
         </article>
     `;
 }
 
 
 /* ======================================================
-   RENDER: HOME
+   HOME
 ====================================================== */
 
 function renderHome() {
-    document.getElementById("greetingText").textContent = `Good morning, ${facultyName} 👋`;
-    document.getElementById("greetingSub").textContent = `Here's what's happening with your projects.`;
 
-    const projects = myProjects();
-    const ongoing = projects.filter((p) => p.status === "Ongoing").length;
+    document.getElementById(
+        "greetingText"
+    ).textContent =
+        `Welcome, ${facultyName} 👋`;
 
-    const pendingIdeas = myIdeas().filter((i) => i.status === "Pending" || i.status === "Needs Revision");
-    const reportsAwaiting = myReports().filter((r) => r.status === "Submitted" || r.status === "Under Review" || r.status === "Resubmitted");
-    const unmanaged = getUnmanagedStudents();
-    const proposedToMe = myIdeas();
+    document.getElementById(
+        "greetingSub"
+    ).textContent =
+        "Here's what's happening with your projects.";
 
-    document.getElementById("statRow").innerHTML = `
+    const ongoing =
+        myProjectsData.filter(
+            (project) =>
+                getProjectStatus(project) ===
+                "Ongoing"
+        ).length;
+
+    const studentCount =
+        interestedStudentsData.length;
+
+    document.getElementById(
+        "statRow"
+    ).innerHTML = `
+
         <div class="stat-card">
-            <p class="stat-value">${ongoing}</p>
-            <p class="stat-label">Active Projects</p>
+            <p class="stat-value">
+                ${ongoing}
+            </p>
+            <p class="stat-label">
+                Active Projects
+            </p>
         </div>
+
         <div class="stat-card">
-            <p class="stat-value">${pendingIdeas.length}</p>
-            <p class="stat-label">Pending Student Ideas</p>
+            <p class="stat-value">
+                ${myProjectsData.length}
+            </p>
+            <p class="stat-label">
+                My Projects
+            </p>
         </div>
+
         <div class="stat-card">
-            <p class="stat-value">${reportsAwaiting.length}</p>
-            <p class="stat-label">Reports Awaiting Review</p>
+            <p class="stat-value">
+                ${studentCount}
+            </p>
+            <p class="stat-label">
+                Students
+            </p>
         </div>
+
         <div class="stat-card">
-            <p class="stat-value">${unmanaged.length}</p>
-            <p class="stat-label">Unmanaged Students</p>
+            <p class="stat-value">
+                ${allProjectsData.length}
+            </p>
+            <p class="stat-label">
+                ILGC Projects
+            </p>
         </div>
+
         <div class="stat-card">
-            <p class="stat-value">${proposedToMe.length}</p>
-            <p class="stat-label">Projects Proposed to Me</p>
+            <p class="stat-value">
+                ${new Set(
+                    interestedStudentsData.map(
+                        (student) =>
+                            student.student_email
+                    )
+                ).size}
+            </p>
+            <p class="stat-label">
+                Unique Students
+            </p>
+        </div>
+
+    `;
+
+    document.getElementById(
+        "pendingActionsList"
+    ).innerHTML = `
+
+        <div
+            class="pending-action-item"
+            data-goto="students"
+            style="cursor:pointer;"
+        >
+            <span class="pending-action-count">
+                ${studentCount}
+            </span>
+
+            <span>
+                student${studentCount !== 1 ? "s" : ""}
+                currently in your project groups
+            </span>
+        </div>
+
+        <div
+            class="pending-action-item"
+            data-goto="projects"
+            style="cursor:pointer;"
+        >
+            <span class="pending-action-count">
+                ${myProjectsData.length}
+            </span>
+
+            <span>
+                project${myProjectsData.length !== 1 ? "s" : ""}
+                assigned to you
+            </span>
         </div>
     `;
 
-    const pendingInterests = interestsForMyProjects().filter((i) => i.status === "Pending");
+    document.getElementById(
+        "activityFeed"
+    ).innerHTML = `
 
-    const pendingActions = [
-        { count: pendingIdeas.length, label: "student idea" + (pendingIdeas.length === 1 ? "" : "s") + " awaiting review", tab: "ideas" },
-        { count: reportsAwaiting.length, label: "report" + (reportsAwaiting.length === 1 ? "" : "s") + " requiring review", tab: "reports" },
-        { count: unmanaged.length, label: "student" + (unmanaged.length === 1 ? "" : "s") + " without a project/group", tab: "unmanaged" },
-        { count: pendingInterests.length, label: "student" + (pendingInterests.length === 1 ? "" : "s") + " awaiting a response", tab: "students" }
-    ];
+        <div class="activity-item">
 
-    const activeActions = pendingActions.filter((a) => a.count > 0);
+            <span class="activity-dot"></span>
 
-    document.getElementById("pendingActionsList").innerHTML = activeActions.length
-        ? activeActions.map((a) => `
-            <div class="pending-action-item" data-goto="${a.tab}" style="cursor:pointer;">
-                <span class="pending-action-count">${a.count}</span>
-                <span>${a.label}</span>
-            </div>
-        `).join("")
-        : `<p class="empty-panel">You're all caught up — nothing needs your attention right now.</p>`;
+            <span>
+                Faculty profile loaded from Supabase.
+                <span class="activity-date">
+                    ${facultyEmail}
+                </span>
+            </span>
 
-    const activity = buildActivityFeed(6);
-    document.getElementById("activityFeed").innerHTML = activity.length
-        ? activity.map((e) => `
-            <div class="activity-item">
-                <span class="activity-dot"></span>
-                <span>${e.text}<span class="activity-date">${e.date}</span></span>
-            </div>
-        `).join("")
-        : `<p class="empty-panel">No recent activity yet.</p>`;
+        </div>
 
-    document.getElementById("homeProjectGrid").innerHTML =
-        projects.map(projectCardHtml).join("") ||
-        `<p class="empty-state">You don't have any projects yet. Float one from My Projects.</p>`;
+        <div class="activity-item">
+
+            <span class="activity-dot"></span>
+
+            <span>
+                ${myProjectsData.length}
+                project${myProjectsData.length !== 1 ? "s" : ""}
+                assigned to you.
+            </span>
+
+        </div>
+    `;
+
+    const normalized =
+        myProjectsData.map(
+            normalizeProject
+        );
+
+    document.getElementById(
+        "homeProjectGrid"
+    ).innerHTML =
+        normalized
+            .slice(0, 6)
+            .map(projectCardHtml)
+            .join("") ||
+        `<p class="empty-state">
+            You don't have any projects assigned yet.
+        </p>`;
 }
 
 
 /* ======================================================
-   RENDER: MY PROJECTS
+   MY PROJECTS
 ====================================================== */
-
-let projectsActiveStatus = "All";
-let projectsActiveYear = "All";
 
 function renderProjectsChips() {
-    const statuses = ["All", ...FORM_STATUSES];
-    document.getElementById("projectsStatusChips").innerHTML = statuses.map((status) => `
-        <button class="chip" data-project-status="${status}" data-active="${status === projectsActiveStatus}">${status}</button>
-    `).join("");
+
+    const statuses =
+        [
+            "All",
+            "Ongoing",
+            "Proposed",
+            "Completed"
+        ];
+
+    document.getElementById(
+        "projectsStatusChips"
+    ).innerHTML =
+        statuses.map(
+            (status) => `
+                <button
+                    class="chip"
+                    data-project-status="${status}"
+                    data-active="${status === projectsActiveStatus}"
+                >
+                    ${status}
+                </button>
+            `
+        ).join("");
 }
 
-function renderProjectsYearFilter() {
-    const years = ["All", ...YEAR_FILTER_OPTIONS];
-    const select = document.getElementById("projectsYearSelect");
-    if (!select) return;
-    select.innerHTML = years.map((y) =>
-        `<option value="${y}" ${y === projectsActiveYear ? "selected" : ""}>${y === "All" ? "All Years" : y}</option>`
-    ).join("");
+
+function renderProjectsSemesterFilter() {
+
+    const semesters = [
+        "All",
+        ...new Set(
+            myProjectsData
+                .map(
+                    (project) =>
+                        project.semester
+                )
+                .filter(Boolean)
+        )
+    ];
+
+    const select =
+        document.getElementById(
+            "projectsYearSelect"
+        );
+
+    if (!select) {
+        return;
+    }
+
+    select.innerHTML =
+        semesters.map(
+            (semester) => `
+                <option
+                    value="${semester}"
+                    ${semester === projectsActiveSemester ? "selected" : ""}
+                >
+                    ${
+                        semester === "All"
+                            ? "All Semesters"
+                            : `Semester ${semester}`
+                    }
+                </option>
+            `
+        ).join("");
 }
+
 
 function renderMyProjects() {
-    const projects = myProjects().filter(
-        (p) => (projectsActiveStatus === "All" || p.status === projectsActiveStatus) &&
-               projectHasYear(p, projectsActiveYear)
-    );
 
-    const grid = document.getElementById("myProjectsGrid");
-    const empty = document.getElementById("myProjectsEmpty");
+    const projects =
+        myProjectsData
+            .map(normalizeProject)
+            .filter(
+                (project) =>
 
-    if (projects.length === 0) {
+                    (
+                        projectsActiveStatus ===
+                        "All" ||
+
+                        project.status ===
+                        projectsActiveStatus
+                    )
+
+                    &&
+
+                    (
+                        projectsActiveSemester ===
+                        "All" ||
+
+                        String(
+                            project.semester
+                        ) ===
+                        String(
+                            projectsActiveSemester
+                        )
+                    )
+            );
+
+    const grid =
+        document.getElementById(
+            "myProjectsGrid"
+        );
+
+    const empty =
+        document.getElementById(
+            "myProjectsEmpty"
+        );
+
+    if (!projects.length) {
+
         grid.innerHTML = "";
-        empty.classList.remove("hidden");
+
+        empty.classList.remove(
+            "hidden"
+        );
+
         return;
     }
 
     empty.classList.add("hidden");
-    grid.innerHTML = projects.map(projectCardHtml).join("");
+
+    grid.innerHTML =
+        projects
+            .map(projectCardHtml)
+            .join("");
 }
 
 
 /* ======================================================
-   RENDER: STUDENT IDEAS
-====================================================== */
-
-let ideasActiveStatus = "All";
-
-function renderIdeasChips() {
-    const statuses = ["All", ...IDEA_STATUSES];
-    document.getElementById("ideasStatusChips").innerHTML = statuses.map((status) => `
-        <button class="chip" data-idea-status="${status}" data-active="${status === ideasActiveStatus}">${status}</button>
-    `).join("");
-}
-
-function ideaCardHtml(idea) {
-    const actions = (idea.status === "Pending" || idea.status === "Needs Revision")
-        ? `
-            <button class="btn btn-primary" data-idea-accept="${idea.id}">Accept</button>
-            <button class="btn btn-danger" data-idea-reject="${idea.id}">Reject</button>
-            <button class="btn btn-secondary" data-idea-revise="${idea.id}">Suggest Revision</button>
-        `
-        : "";
-
-    const feedbackHtml = idea.feedback
-        ? `<div class="idea-feedback-box"><strong>Your feedback</strong>${idea.feedback}</div>`
-        : "";
-
-    return `
-        <article class="idea-card">
-            <div class="idea-card-top">
-                <div>
-                    <p class="idea-title">${idea.title}</p>
-                    <p class="idea-meta"><strong>${idea.studentName}</strong> · Sem ${idea.studentSemester} · ${idea.domain} · Proposed ${idea.proposedDate}</p>
-                    <div style="margin-top:8px;"><span class="origin-badge origin-student">Student-floated · ${idea.studentName}</span></div>
-                </div>
-                <span class="badge ${ideaBadgeClass(idea.status)}">${idea.status}</span>
-            </div>
-
-            <p class="idea-section-label">Problem statement</p>
-            <p class="idea-text">${idea.problemStatement}</p>
-
-            <p class="idea-section-label">Scope</p>
-            <p class="idea-text">${idea.scope}</p>
-
-            <div class="idea-tag-row">${(idea.tags || []).map((t) => `<span class="idea-tag">${t}</span>`).join("")}</div>
-
-            ${feedbackHtml}
-
-            <div class="idea-card-actions">${actions}</div>
-        </article>
-    `;
-}
-
-function renderIdeas() {
-    const ideas = myIdeas()
-        .filter((i) => ideasActiveStatus === "All" || i.status === ideasActiveStatus)
-        .sort((a, b) => new Date(b.proposedDate) - new Date(a.proposedDate));
-
-    const list = document.getElementById("ideasList");
-    const empty = document.getElementById("ideasEmpty");
-
-    if (ideas.length === 0) {
-        list.innerHTML = "";
-        empty.classList.remove("hidden");
-        return;
-    }
-
-    empty.classList.add("hidden");
-    list.innerHTML = ideas.map(ideaCardHtml).join("");
-}
-
-function openIdeaDecisionModal(ideaId, decision) {
-    const idea = getAllIdeas().find((i) => i.id === ideaId);
-    if (!idea) return;
-
-    const titleMap = { Accepted: "Accept idea", Rejected: "Reject idea", "Needs Revision": "Request a revision" };
-    const btnMap = { Accepted: "Accept idea", Rejected: "Reject idea", "Needs Revision": "Send feedback" };
-
-    modalBody.innerHTML = `
-        <p class="modal-eyebrow">${titleMap[decision]}</p>
-        <h2 class="modal-title">${idea.title}</h2>
-        <p class="modal-text" style="margin-bottom:16px;">Proposed by ${idea.studentName} · Sem ${idea.studentSemester}</p>
-
-        <form id="ideaDecisionForm">
-            <div class="modal-field">
-                <label for="ideaComment">${decision === "Needs Revision" ? "Specific revision suggestions" : "Comments (optional)"}</label>
-                <textarea id="ideaComment" ${decision === "Needs Revision" ? "required" : ""} placeholder="${decision === "Needs Revision" ? "Let the student know what to change before resubmitting…" : "Add an optional note for the student…"}"></textarea>
-            </div>
-            <div class="modal-actions">
-                <button type="submit" class="btn btn-primary">${btnMap[decision]}</button>
-            </div>
-        </form>
-    `;
-
-    modalOverlay.classList.remove("hidden");
-
-    document.getElementById("ideaDecisionForm").addEventListener("submit", (e) => {
-        e.preventDefault();
-        const comment = document.getElementById("ideaComment").value.trim();
-        updateIdea(ideaId, { status: decision, feedback: comment || idea.feedback || "" });
-
-        const toastMap = {
-            Accepted: `"${idea.title}" accepted ✓`,
-            Rejected: `"${idea.title}" rejected.`,
-            "Needs Revision": `Feedback sent to ${idea.studentName} ✓`
-        };
-        showToast(toastMap[decision]);
-        closeModal();
-        renderIdeas();
-        renderHome();
-    });
-}
-
-
-/* ======================================================
-   RENDER: INTERESTED STUDENTS
+   INTERESTED STUDENTS
 ====================================================== */
 
 function renderStudents() {
-    const rows = interestsForMyProjects().sort(
-        (a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)
+
+    const container =
+        document.getElementById(
+            "studentsTable"
+        );
+
+    const empty =
+        document.getElementById(
+            "studentsEmpty"
+        );
+
+    if (!interestedStudentsData.length) {
+
+        container.innerHTML = "";
+
+        empty.classList.remove(
+            "hidden"
+        );
+
+        return;
+    }
+
+    empty.classList.add(
+        "hidden"
     );
 
-    const container = document.getElementById("studentsTable");
-    const empty = document.getElementById("studentsEmpty");
+    const rows =
+        interestedStudentsData
+            .map((member) => {
 
-    if (rows.length === 0) {
-        container.innerHTML = "";
-        empty.classList.remove("hidden");
-        return;
-    }
+                const student =
+                    member.student;
 
-    empty.classList.add("hidden");
+                const project =
+                    member.project;
 
-    const allProjects = getAllProjects();
+                return `
+                    <div class="student-row">
 
-    const bodyRows = rows.map((interest) => {
-        const project = allProjects.find((p) => p.id === interest.projectId);
-        const student = deriveStudentProfile(interest.studentUserId);
+                        <span class="student-name">
+                            ${getStudentName(student)}
+                        </span>
 
-        const otherInterests = loadInterestsFor(interest.studentUserId);
-        const acceptedElsewhere = otherInterests.find((i) => i.status === "Accepted");
-        const currentProject = acceptedElsewhere
-            ? (allProjects.find((p) => p.id === acceptedElsewhere.projectId) || {}).title
-            : "None";
+                        <span class="student-cell">
+                            Sem ${getSemester(student)}
+                        </span>
 
-        const actions = interest.status === "Pending"
-            ? `
-                <button class="btn btn-primary" data-accept="${interest.studentUserId}|${interest.projectId}">Accept</button>
-                <button class="btn btn-danger" data-reject="${interest.studentUserId}|${interest.projectId}">Reject</button>
-            `
-            : `<span class="badge ${interestBadgeClass(interest.status)}">${interest.status}</span>`;
+                        <span class="student-cell">
+                            ${project?.title || "—"}
+                        </span>
 
-        return `
-            <div class="student-row">
-                <span class="student-name">${student.name}</span>
-                <span class="student-cell">Sem ${student.semester} · ${cohortCodeFromSemester(student.semester)}</span>
-                <span class="student-cell">${currentProject || "None"}</span>
-                <span class="student-project-of-interest">${project ? project.title : "—"}</span>
-                <span class="student-cell">${interest.status}</span>
-                <div class="student-actions">${actions}</div>
-            </div>
-        `;
-    }).join("");
+                        <span class="student-project-of-interest">
+                            ${project?.title || "—"}
+                        </span>
+
+                        <span class="student-cell">
+                            ${member.member_role || "Member"}
+                        </span>
+
+                        <div class="student-actions">
+                            <button
+                                class="btn btn-secondary"
+                                data-student-email="${member.student_email}"
+                            >
+                                View
+                            </button>
+                        </div>
+
+                    </div>
+                `;
+            })
+            .join("");
 
     container.innerHTML = `
+
         <div class="student-row head">
+
             <span>Student</span>
             <span>Semester</span>
-            <span>Current Project</span>
-            <span>Interested In</span>
-            <span>Status</span>
-            <span>Action</span>
-        </div>
-        ${bodyRows}
-    `;
-}
-
-function acceptInterest(studentUserId, projectId) {
-    updateInterestStatus(studentUserId, projectId, "Accepted");
-
-    const student = deriveStudentProfile(studentUserId);
-    const project = getAllProjects().find((p) => p.id === projectId);
-    if (project) {
-        const team = [...(project.team || [])];
-        if (!team.some((m) => m.name === student.name)) {
-            team.push({ name: student.name, semester: student.semester });
-        }
-        editProject(projectId, { team });
-    }
-
-    showToast(`${student.name} accepted onto the team ✓`);
-    renderAll();
-}
-
-function rejectInterest(studentUserId, projectId) {
-    updateInterestStatus(studentUserId, projectId, "Rejected");
-    const student = deriveStudentProfile(studentUserId);
-    showToast(`${student.name}'s interest was declined.`);
-    renderAll();
-}
-
-
-/* ======================================================
-   RENDER: PROJECT REPORTS
-====================================================== */
-
-let reportsActiveStatus = "All";
-
-function renderReportsChips() {
-    const statuses = ["All", ...REPORT_STATUSES];
-    document.getElementById("reportsStatusChips").innerHTML = statuses.map((status) => `
-        <button class="chip" data-report-status="${status}" data-active="${status === reportsActiveStatus}">${status}</button>
-    `).join("");
-}
-
-function renderReports() {
-    const reports = myReports()
-        .filter((r) => reportsActiveStatus === "All" || r.status === reportsActiveStatus)
-        .sort((a, b) => new Date(b.submittedDate) - new Date(a.submittedDate));
-
-    const container = document.getElementById("reportsTable");
-    const empty = document.getElementById("reportsEmpty");
-
-    if (reports.length === 0) {
-        container.innerHTML = "";
-        empty.classList.remove("hidden");
-        return;
-    }
-
-    empty.classList.add("hidden");
-
-    const allProjects = getAllProjects();
-
-    const rows = reports.map((report) => {
-        const project = allProjects.find((p) => p.id === report.projectId);
-        return `
-            <div class="report-row" data-report-open="${report.id}">
-                <span class="report-project">${project ? project.title : "—"}</span>
-                <span class="report-cell">${report.reportType}</span>
-                <span class="report-cell">${report.submittedBy}</span>
-                <span class="report-cell">${report.submittedDate}</span>
-                <span><span class="badge ${reportBadgeClass(report.status)}">${report.status}</span></span>
-                <button class="btn btn-secondary" data-report-open="${report.id}">View</button>
-            </div>
-        `;
-    }).join("");
-
-    container.innerHTML = `
-        <div class="report-row head">
             <span>Project</span>
-            <span>Report Type</span>
-            <span>Submitted By</span>
-            <span>Date</span>
-            <span>Status</span>
-            <span></span>
+            <span>Project</span>
+            <span>Role</span>
+            <span>Action</span>
+
         </div>
+
         ${rows}
     `;
 }
 
-function openReportDetailModal(reportId) {
-    const report = getAllReports().find((r) => r.id === reportId);
-    if (!report) return;
-
-    const project = getAllProjects().find((p) => p.id === report.projectId) || {};
-    const team = project.team || [];
-
-    const timelineHtml = REPORT_TIMELINE.map((step) => {
-        const reached = report.history.some((h) => h.status === step) ||
-            (step === "Resubmitted" && report.status === "Approved" && report.history.some((h) => h.status === "Resubmitted"));
-        return `<span class="report-timeline-step ${reached ? "done" : ""}">${step}</span>`;
-    }).join("");
-
-    const teamHtml = team.length
-        ? `<div class="modal-team">${team.map((m) => `<span class="team-chip">${m.name} · Sem ${m.semester} · ${cohortCodeFromSemester(m.semester)}</span>`).join("")}</div>`
-        : `<p class="modal-text">No students on this project yet.</p>`;
-
-    const commentsHtml = report.comments.length
-        ? report.comments.map((c) => `
-            <div class="report-comment">
-                <span class="report-comment-author">${c.author}<span class="report-comment-date">${c.date}</span></span>
-                <p class="report-comment-text">${c.text}</p>
-            </div>
-        `).join("")
-        : `<p class="modal-text">No comments yet.</p>`;
-
-    const actionsHtml = (report.status === "Submitted" || report.status === "Under Review" || report.status === "Resubmitted")
-        ? `
-            <button class="btn btn-primary" data-report-approve="${report.id}">Approve</button>
-            <button class="btn btn-secondary" data-report-request-changes="${report.id}">Request Changes</button>
-        `
-        : "";
-
-    modalBody.innerHTML = `
-        <p class="modal-eyebrow">${project.domain || ""} · ${report.reportType}</p>
-        <h2 class="modal-title">${project.title || "Untitled project"}</h2>
-
-        <div class="report-timeline">${timelineHtml}</div>
-
-        <p class="modal-section-label">Report info</p>
-        <div class="modal-meta-row">
-            <div class="modal-meta-item">
-                <span class="meta-label">Submitted by</span>
-                <span class="meta-value">${report.submittedBy}</span>
-            </div>
-            <div class="modal-meta-item">
-                <span class="meta-label">Date</span>
-                <span class="meta-value">${report.submittedDate}</span>
-            </div>
-            <div class="modal-meta-item">
-                <span class="meta-label">Mentor</span>
-                <span class="meta-value">${project.mentor || "—"}</span>
-            </div>
-        </div>
-
-        <p class="modal-section-label">Report preview</p>
-        <p class="modal-text">${report.preview}</p>
-
-        <p class="modal-section-label">Group members</p>
-        ${teamHtml}
-
-        <p class="modal-section-label">Comments &amp; feedback</p>
-        <div id="reportCommentsList">${commentsHtml}</div>
-
-        <div class="modal-field" style="margin-top:12px;">
-            <label for="newReportComment">Add a comment</label>
-            <textarea id="newReportComment" placeholder="Leave feedback for the group…"></textarea>
-        </div>
-        <button class="btn btn-secondary" id="addReportCommentBtn" style="margin-bottom:8px;">Add Comment</button>
-
-        <div class="modal-actions">${actionsHtml}</div>
-    `;
-
-    modalOverlay.classList.remove("hidden");
-
-    document.getElementById("addReportCommentBtn").addEventListener("click", () => {
-        const text = document.getElementById("newReportComment").value.trim();
-        if (!text) return;
-        addReportComment(reportId, text, facultyName);
-        showToast("Comment added ✓");
-        openReportDetailModal(reportId);
-        renderReports();
-    });
-}
-
-function approveReport(reportId) {
-    updateReportStatus(reportId, "Approved", facultyName);
-    showToast("Report approved ✓");
-    closeModal();
-    renderReports();
-    renderHome();
-}
-
-function requestReportChanges(reportId) {
-    modalBody.innerHTML = `
-        <p class="modal-eyebrow">Request changes</p>
-        <h2 class="modal-title">What needs to change?</h2>
-        <form id="requestChangesForm">
-            <div class="modal-field">
-                <label for="changesNote">Feedback for the group</label>
-                <textarea id="changesNote" required placeholder="Explain what needs revising before resubmission…"></textarea>
-            </div>
-            <div class="modal-actions">
-                <button type="submit" class="btn btn-primary">Send &amp; Request Changes</button>
-            </div>
-        </form>
-    `;
-    modalOverlay.classList.remove("hidden");
-
-    document.getElementById("requestChangesForm").addEventListener("submit", (e) => {
-        e.preventDefault();
-        const note = document.getElementById("changesNote").value.trim();
-        updateReportStatus(reportId, "Changes Requested", facultyName, note);
-        showToast("Changes requested ✓");
-        closeModal();
-        renderReports();
-        renderHome();
-    });
-}
-
 
 /* ======================================================
-   RENDER: UNMANAGED STUDENTS
+   STUDENT PROFILE MODAL
 ====================================================== */
 
-let unmanagedDomainFilter = "All";
-let unmanagedYearFilter = "All";
+function openStudentModal(email) {
 
-function renderUnmanagedFilters() {
-    const domains = ["All", ...new Set(UNMANAGED_STUDENTS.flatMap((s) => s.preferredDomains))];
-    // Year filter mirrors the project year filter: only 2nd and 3rd year.
-    const years = ["All", ...YEAR_FILTER_OPTIONS];
+    const member =
+        interestedStudentsData.find(
+            (item) =>
+                item.student_email ===
+                email
+        );
 
-    document.getElementById("unmanagedFilters").innerHTML = `
-        <select id="unmanagedDomainSelect">
-            ${domains.map((d) => `<option value="${d}" ${d === unmanagedDomainFilter ? "selected" : ""}>${d === "All" ? "All Domains" : d}</option>`).join("")}
-        </select>
-        <select id="unmanagedYearSelect">
-            ${years.map((y) => `<option value="${y}" ${y === unmanagedYearFilter ? "selected" : ""}>${y === "All" ? "All Years" : y}</option>`).join("")}
-        </select>
-    `;
-
-    document.getElementById("unmanagedDomainSelect").addEventListener("change", (e) => {
-        unmanagedDomainFilter = e.target.value;
-        renderUnmanaged();
-    });
-    document.getElementById("unmanagedYearSelect").addEventListener("change", (e) => {
-        unmanagedYearFilter = e.target.value;
-        renderUnmanaged();
-    });
-}
-
-function unmanagedCardHtml(student) {
-    return `
-        <article class="unmanaged-card">
-            <div class="unmanaged-card-head">
-                <div>
-                    <p class="unmanaged-name">${student.name}</p>
-                    <p class="unmanaged-dept">${student.department} · ${student.year}</p>
-                </div>
-            </div>
-
-            <p class="unmanaged-field-label">Skills</p>
-            <div class="unmanaged-chip-row">${student.skills.map((s) => `<span class="unmanaged-chip">${s}</span>`).join("")}</div>
-
-            <p class="unmanaged-field-label">Preferred domains</p>
-            <div class="unmanaged-chip-row">${student.preferredDomains.map((d) => `<span class="unmanaged-chip">${d}</span>`).join("")}</div>
-
-            <p class="unmanaged-field-label">Availability</p>
-            <p class="idea-text">${student.availability}</p>
-
-            <div class="unmanaged-card-actions">
-                <button class="btn btn-secondary" data-unmanaged-profile="${student.id}">View Profile</button>
-                <button class="btn btn-secondary" data-unmanaged-email="${student.id}">✉ Email Student</button>
-                <button class="btn btn-primary" data-unmanaged-assign="${student.id}">Assign to Group</button>
-            </div>
-        </article>
-    `;
-}
-
-function renderUnmanaged() {
-    const students = getUnmanagedStudents().filter((s) =>
-        (unmanagedDomainFilter === "All" || s.preferredDomains.includes(unmanagedDomainFilter)) &&
-        (unmanagedYearFilter === "All" || yearFromSemester(s.semester) === unmanagedYearFilter)
-    );
-
-    const grid = document.getElementById("unmanagedGrid");
-    const empty = document.getElementById("unmanagedEmpty");
-
-    if (students.length === 0) {
-        grid.innerHTML = "";
-        empty.classList.remove("hidden");
+    if (!member) {
         return;
     }
 
-    empty.classList.add("hidden");
-    grid.innerHTML = students.map(unmanagedCardHtml).join("");
-}
+    const student =
+        member.student || {};
 
-function openUnmanagedProfileModal(studentId) {
-    const student = UNMANAGED_STUDENTS.find((s) => s.id === studentId);
-    if (!student) return;
-
-    const prevHtml = student.previousProjects.length
-        ? `<div class="modal-team">${student.previousProjects.map((p) => `<span class="team-chip">${p}</span>`).join("")}</div>`
-        : `<p class="modal-text">No previous project experience on record.</p>`;
+    const project =
+        member.project || {};
 
     modalBody.innerHTML = `
-        <p class="modal-eyebrow">${student.department} · ${student.year}</p>
-        <h2 class="modal-title">${student.name}</h2>
+
+        <p class="modal-eyebrow">
+            STUDENT PROFILE
+        </p>
+
+        <h2 class="modal-title">
+            ${getStudentName(student)}
+        </h2>
 
         <div class="modal-meta-row">
+
             <div class="modal-meta-item">
-                <span class="meta-label">Semester</span>
-                <span class="meta-value">${student.semester} · ${student.year}</span>
+                <span class="meta-label">
+                    Email
+                </span>
+
+                <span class="meta-value">
+                    ${student.email || email}
+                </span>
             </div>
+
             <div class="modal-meta-item">
-                <span class="meta-label">Availability</span>
-                <span class="meta-value">${student.availability}</span>
+                <span class="meta-label">
+                    Semester
+                </span>
+
+                <span class="meta-value">
+                    ${getSemester(student)}
+                </span>
             </div>
+
             <div class="modal-meta-item">
-                <span class="meta-label">Email</span>
-                <span class="meta-value">${studentEmail(student.name)}</span>
+                <span class="meta-label">
+                    Project
+                </span>
+
+                <span class="meta-value">
+                    ${project.title || "—"}
+                </span>
             </div>
+
         </div>
 
-        <p class="modal-section-label">Skills</p>
-        <div class="modal-team">${student.skills.map((s) => `<span class="team-chip">${s}</span>`).join("")}</div>
+        ${
+            student.department
+                ? `
+                    <p class="modal-section-label">
+                        Department
+                    </p>
 
-        <p class="modal-section-label">Areas of interest</p>
-        <div class="modal-team">${student.interests.map((s) => `<span class="team-chip">${s}</span>`).join("")}</div>
+                    <p class="modal-text">
+                        ${student.department}
+                    </p>
+                `
+                : ""
+        }
 
-        <p class="modal-section-label">Preferred domains</p>
-        <div class="modal-team">${student.preferredDomains.map((s) => `<span class="team-chip">${s}</span>`).join("")}</div>
+        ${
+            student.bio
+                ? `
+                    <p class="modal-section-label">
+                        Bio
+                    </p>
 
-        <p class="modal-section-label">Previous projects</p>
-        ${prevHtml}
+                    <p class="modal-text">
+                        ${student.bio}
+                    </p>
+                `
+                : ""
+        }
 
         <div class="modal-actions">
-            <button class="btn btn-secondary" data-unmanaged-email="${student.id}">✉ Email Student</button>
-            <button class="btn btn-primary" data-unmanaged-assign="${student.id}">Assign to Group</button>
+
+            <button
+                class="btn btn-secondary"
+                onclick="window.location.href='mailto:${student.email || email}'"
+            >
+                ✉ Email Student
+            </button>
+
         </div>
     `;
 
-    modalOverlay.classList.remove("hidden");
-}
-
-function openAssignModal(studentId) {
-    const student = UNMANAGED_STUDENTS.find((s) => s.id === studentId);
-    if (!student) return;
-
-    const options = myProjects().map((p) => `<option value="${p.id}">${p.title}</option>`).join("");
-
-    modalBody.innerHTML = `
-        <p class="modal-eyebrow">Assign to group</p>
-        <h2 class="modal-title">${student.name}</h2>
-        ${options
-            ? `
-                <form id="assignForm">
-                    <div class="modal-field">
-                        <label for="assignProjectSelect">Choose one of your projects</label>
-                        <select id="assignProjectSelect">${options}</select>
-                    </div>
-                    <div class="modal-actions">
-                        <button type="submit" class="btn btn-primary">Assign Student</button>
-                    </div>
-                </form>
-            `
-            : `<p class="modal-text">You don't have any projects to assign students to yet. Float a project first.</p>`
-        }
-    `;
-
-    modalOverlay.classList.remove("hidden");
-
-    const form = document.getElementById("assignForm");
-    if (form) {
-        form.addEventListener("submit", (e) => {
-            e.preventDefault();
-            const projectId = document.getElementById("assignProjectSelect").value;
-            assignStudentToProject(studentId, projectId);
-            showToast(`${student.name} assigned ✓`);
-            closeModal();
-            renderUnmanaged();
-            renderDiscover();
-            renderHome();
-        });
-    }
-}
-
-function emailStudent(studentId) {
-    const student = UNMANAGED_STUDENTS.find((s) => s.id === studentId);
-    if (!student) return;
-
-    const to = studentEmail(student.name);
-    const subject = `ILGC — opportunity to join a project`;
-    const body =
-        `Hi ${student.name.split(" ")[0]},\n\n` +
-        `I came across your profile on the ILGC portal and I'd like to talk to you about ` +
-        `joining one of my projects. Could we find a time to connect this week?\n\n` +
-        `Best regards,\n${facultyName}`;
-
-    // Open Outlook on the web compose window, pre-addressed to the student.
-    const outlookUrl =
-        `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(to)}` +
-        `&subject=${encodeURIComponent(subject)}` +
-        `&body=${encodeURIComponent(body)}`;
-
-    const win = window.open(outlookUrl, "_blank", "noopener");
-
-    // Fallback to the default mail client (Outlook desktop, etc.) if the
-    // popup was blocked.
-    if (!win) {
-        window.location.href =
-            `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    }
-
-    showToast(`Opening email to ${student.name} ✉`);
+    modalOverlay.classList.remove(
+        "hidden"
+    );
 }
 
 
 /* ======================================================
-   RENDER: PROJECT TAGS
+   DISCOVER PROJECTS
 ====================================================== */
-
-function tagUsageCount(tag) {
-    return myProjects().filter((p) => (p.tags || []).includes(tag)).length;
-}
-
-function renderTags() {
-    const tags = loadTags();
-
-    document.getElementById("tagManageList").innerHTML = tags.length
-        ? tags.map((tag) => `
-            <div class="tag-manage-row" data-tag-row="${tag}">
-                <span>
-                    <span class="tag-manage-name">${tag}</span>
-                    <span class="tag-manage-count">${tagUsageCount(tag)} of your projects</span>
-                </span>
-                <div class="tag-manage-actions">
-                    <button class="btn btn-secondary" data-tag-edit="${tag}">Edit</button>
-                    <button class="btn btn-danger" data-tag-remove="${tag}">Remove</button>
-                </div>
-            </div>
-        `).join("")
-        : `<p class="empty-state">No tags yet. Add one above.</p>`;
-}
-
-function startEditTag(tag) {
-    const row = document.querySelector(`[data-tag-row="${CSS.escape(tag)}"]`);
-    if (!row) return;
-
-    row.innerHTML = `
-        <input type="text" class="tag-edit-input" value="${tag}" id="tagEditInput">
-        <div class="tag-manage-actions">
-            <button class="btn btn-primary" id="tagEditSave">Save</button>
-            <button class="btn btn-secondary" id="tagEditCancel">Cancel</button>
-        </div>
-    `;
-
-    document.getElementById("tagEditSave").addEventListener("click", () => {
-        const newName = document.getElementById("tagEditInput").value.trim();
-        if (newName && newName !== tag) {
-            editTagName(tag, newName);
-            showToast("Tag updated ✓");
-        }
-        renderTags();
-        renderMyProjects();
-        renderIdeas();
-    });
-
-    document.getElementById("tagEditCancel").addEventListener("click", renderTags);
-}
-
-
-/* ======================================================
-   RENDER: DISCOVER PROJECTS (institute-wide, read-only)
-   Shows every project across ILGC — floated by students,
-   faculty, or mentors — so faculty can see the full picture,
-   not just their own. Reads getAllProjects(), so anything
-   floated in any portal shows up here.
-====================================================== */
-
-const DISCOVER_STATUSES = ["All", "Ongoing", "Proposed", "Completed"];
-let discoverStatus = "All";
-let discoverDomain = "All";
-let discoverMentor = "All";
-let discoverSearch = "";
 
 function discoverDomains() {
-    return ["All", ...new Set(getAllProjects().map((p) => p.domain))];
+
+    return [
+        "All",
+        ...new Set(
+            allProjectsData.flatMap(
+                (project) =>
+                    project.domains || []
+            )
+        )
+    ];
 }
+
 
 function discoverMentors() {
-    return ["All", ...[...new Set(getAllProjects().map((p) => p.mentor).filter(Boolean))].sort()];
+
+    return [
+        "All",
+        ...[
+            ...new Set(
+                allProjectsData.flatMap(
+                    (project) =>
+                        project.mentors || []
+                )
+            )
+        ].sort()
+    ];
 }
 
+
 function renderDiscoverChips() {
-    document.getElementById("discoverStatusChips").innerHTML = DISCOVER_STATUSES.map((s) => `
-        <button class="chip" data-discover-status="${s}" data-active="${s === discoverStatus}">${s}</button>
-    `).join("");
 
-    document.getElementById("discoverDomainChips").innerHTML = discoverDomains().map((d) => `
-        <button class="chip" data-discover-domain="${d}" data-active="${d === discoverDomain}">${d}</button>
-    `).join("");
-
-    const mentorSelect = document.getElementById("discoverMentorSelect");
-    if (mentorSelect) {
-        mentorSelect.innerHTML = discoverMentors().map((m) =>
-            `<option value="${m}" ${m === discoverMentor ? "selected" : ""}>${m === "All" ? "All professors" : m}</option>`
+    document.getElementById(
+        "discoverStatusChips"
+    ).innerHTML =
+        [
+            "All",
+            "Ongoing",
+            "Proposed",
+            "Completed"
+        ].map(
+            (status) => `
+                <button
+                    class="chip"
+                    data-discover-status="${status}"
+                    data-active="${status === discoverStatus}"
+                >
+                    ${status}
+                </button>
+            `
         ).join("");
+
+    document.getElementById(
+        "discoverDomainChips"
+    ).innerHTML =
+        discoverDomains()
+            .map(
+                (domain) => `
+                    <button
+                        class="chip"
+                        data-discover-domain="${domain}"
+                        data-active="${domain === discoverDomain}"
+                    >
+                        ${domain}
+                    </button>
+                `
+            ).join("");
+
+    const mentorSelect =
+        document.getElementById(
+            "discoverMentorSelect"
+        );
+
+    if (mentorSelect) {
+
+        mentorSelect.innerHTML =
+            discoverMentors()
+                .map(
+                    (mentor) => `
+                        <option
+                            value="${mentor}"
+                            ${
+                                mentor ===
+                                discoverMentor
+                                    ? "selected"
+                                    : ""
+                            }
+                        >
+                            ${
+                                mentor === "All"
+                                    ? "All professors"
+                                    : mentor
+                            }
+                        </option>
+                    `
+                ).join("");
     }
 }
 
+
 function discoverCardHtml(project) {
-    const teamCount = (project.team || []).length;
+
+    const members =
+        interestedStudentsData.filter(
+            (member) =>
+                member.project_code ===
+                project.id
+        );
+
     return `
         <article class="project-card">
+
             <div class="project-card-top">
-                <span class="project-domain">${project.domain}</span>
-                <span class="badge ${statusBadgeClass(project.status)}">${project.status}</span>
+
+                <span class="project-domain">
+                    ${project.domain}
+                </span>
+
+                <span class="badge ${statusBadgeClass(project.status)}">
+                    ${project.status}
+                </span>
+
             </div>
+
             <div class="project-card-body">
-                <h3 class="project-title" data-open="${project.id}">${project.title}</h3>
-                <div style="margin-bottom:10px;"><span class="origin-badge origin-${project.origin || "faculty"}">${projectOriginLabel(project)}</span></div>
-                <p class="project-description">${project.summary}</p>
-                <p class="project-mentor-row">${project.mentor}</p>
-                <div class="project-card-stats" style="margin-bottom:12px;">
-                    <span class="project-card-stat"><strong>${teamCount}</strong> student${teamCount !== 1 ? "s" : ""}</span>
-                    <span class="project-card-stat"><strong>${project.progress}%</strong> complete</span>
+
+                <h3
+                    class="project-title"
+                    data-open="${project.id}"
+                >
+                    ${project.title}
+                </h3>
+
+                <p class="project-description">
+                    ${project.summary}
+                </p>
+
+                <p class="project-mentor-row">
+                    ${project.mentor}
+                </p>
+
+                <div
+                    class="project-card-stats"
+                    style="margin-bottom:12px;"
+                >
+
+                    <span class="project-card-stat">
+                        <strong>
+                            ${members.length}
+                        </strong>
+                        student${members.length !== 1 ? "s" : ""}
+                    </span>
+
+                    <span class="project-card-stat">
+                        <strong>
+                            ${project.progress}%
+                        </strong>
+                        complete
+                    </span>
+
                 </div>
+
                 <div class="project-card-actions">
-                    <button class="btn btn-primary" data-open="${project.id}">Details</button>
+
+                    <button
+                        class="btn btn-primary"
+                        data-open="${project.id}"
+                    >
+                        Details
+                    </button>
+
                 </div>
+
             </div>
+
         </article>
     `;
 }
 
+
 function renderDiscover() {
-    const term = discoverSearch.toLowerCase();
-    const filtered = getAllProjects().filter((p) => {
-        const statusMatch = discoverStatus === "All" || p.status === discoverStatus;
-        const domainMatch = discoverDomain === "All" || p.domain === discoverDomain;
-        const mentorMatch = discoverMentor === "All" || p.mentor === discoverMentor;
-        const searchMatch = !term ||
-            p.title.toLowerCase().includes(term) ||
-            (p.summary || "").toLowerCase().includes(term) ||
-            (p.domain || "").toLowerCase().includes(term) ||
-            (p.mentor || "").toLowerCase().includes(term);
-        return statusMatch && domainMatch && mentorMatch && searchMatch;
-    });
 
-    const grid = document.getElementById("discoverGrid");
-    const empty = document.getElementById("discoverEmpty");
+    const term =
+        discoverSearch
+            .toLowerCase();
 
-    document.getElementById("discoverCount").textContent =
+    const filtered =
+        allProjectsData
+            .map(normalizeProject)
+            .filter((project) => {
+
+                const statusMatch =
+                    discoverStatus ===
+                    "All" ||
+                    project.status ===
+                    discoverStatus;
+
+                const domainMatch =
+                    discoverDomain ===
+                    "All" ||
+                    project.domains
+                        .map(
+                            (domain) =>
+                                domain
+                                    .toLowerCase()
+                        )
+                        .includes(
+                            discoverDomain
+                                .toLowerCase()
+                        );
+
+                const mentorMatch =
+                    discoverMentor ===
+                    "All" ||
+                    project.mentors.includes(
+                        discoverMentor
+                    );
+
+                const searchMatch =
+                    !term ||
+
+                    project.title
+                        .toLowerCase()
+                        .includes(term) ||
+
+                    project.summary
+                        .toLowerCase()
+                        .includes(term) ||
+
+                    project.domain
+                        .toLowerCase()
+                        .includes(term) ||
+
+                    project.mentor
+                        .toLowerCase()
+                        .includes(term);
+
+                return (
+                    statusMatch &&
+                    domainMatch &&
+                    mentorMatch &&
+                    searchMatch
+                );
+            });
+
+    document.getElementById(
+        "discoverCount"
+    ).textContent =
         `${filtered.length} project${filtered.length !== 1 ? "s" : ""}`;
 
-    if (filtered.length === 0) {
+    const grid =
+        document.getElementById(
+            "discoverGrid"
+        );
+
+    const empty =
+        document.getElementById(
+            "discoverEmpty"
+        );
+
+    if (!filtered.length) {
+
         grid.innerHTML = "";
-        empty.classList.remove("hidden");
+
+        empty.classList.remove(
+            "hidden"
+        );
+
         return;
     }
-    empty.classList.add("hidden");
-    grid.innerHTML = filtered.map(discoverCardHtml).join("");
+
+    empty.classList.add(
+        "hidden"
+    );
+
+    grid.innerHTML =
+        filtered
+            .map(discoverCardHtml)
+            .join("");
 }
 
 
 /* ======================================================
-   RENDER: NOTIFICATIONS (faculty)
+   PROJECT DETAIL MODAL
 ====================================================== */
 
-function buildNotifications() {
-    const notifications = [];
-    const myIds = new Set(myProjects().map((p) => p.id));
+const modalOverlay =
+    document.getElementById(
+        "modalOverlay"
+    );
 
-    interestsForMyProjects().filter((i) => i.status === "Pending").forEach((i) => {
-        const student = deriveStudentProfile(i.studentUserId);
-        const project = getAllProjects().find((p) => p.id === i.projectId);
-        notifications.push({
-            icon: "👤",
-            date: (i.submittedAt || "").slice(0, 10),
-            text: `<strong>${student.name}</strong> expressed interest in ${project ? project.title : "a project"}.`
-        });
-    });
+const modalBody =
+    document.getElementById(
+        "modalBody"
+    );
 
-    myIdeas().filter((i) => i.status === "Pending" || i.status === "Needs Revision").forEach((i) => {
-        notifications.push({
-            icon: "💡",
-            date: i.proposedDate,
-            text: `<strong>${i.studentName}</strong> floated a new idea — "${i.title}".`
-        });
-    });
 
-    myReports().filter((r) => r.status === "Submitted" || r.status === "Under Review" || r.status === "Resubmitted").forEach((r) => {
-        const project = getAllProjects().find((p) => p.id === r.projectId);
-        notifications.push({
-            icon: "📄",
-            date: r.submittedDate,
-            text: `${r.submittedBy} submitted a ${r.reportType.toLowerCase()} for <strong>${project ? project.title : "a project"}</strong> — review required.`
-        });
-    });
+function openDetailModal(projectId) {
 
-    return notifications
-        .filter((n) => n.date)
-        .sort((a, b) => new Date(b.date) - new Date(a.date));
-}
+    const project =
+        allProjectsData
+            .map(normalizeProject)
+            .find(
+                (item) =>
+                    item.id ===
+                    projectId
+            );
 
-function renderNotifications() {
-    const notifications = buildNotifications();
-    document.getElementById("notificationsList").innerHTML = notifications.length
-        ? notifications.map((n) => `
-            <div class="notification-item">
-                <span class="notification-icon">${n.icon}</span>
-                <span class="notification-text">${n.text}<span class="notification-date">${n.date}</span></span>
-            </div>
-        `).join("")
-        : `<p class="empty-state">You're all caught up — no new notifications.</p>`;
-}
-
-function renderNotifBadge() {
-    const count = buildNotifications().length;
-    const badge = document.getElementById("notifBadge");
-    if (!badge) return;
-    if (count > 0) {
-        badge.textContent = count > 9 ? "9+" : String(count);
-        badge.classList.remove("hidden");
-    } else {
-        badge.classList.add("hidden");
+    if (!project) {
+        return;
     }
+
+    const members =
+        interestedStudentsData.filter(
+            (member) =>
+                member.project_code ===
+                projectId
+        );
+
+    const teamHtml =
+        members.length
+
+            ? `
+                <div class="modal-team">
+                    ${members.map(
+                        (member) => `
+                            <span class="team-chip">
+                                ${getStudentName(member.student)}
+                                · Sem ${getSemester(member.student)}
+                            </span>
+                        `
+                    ).join("")}
+                </div>
+            `
+
+            : `
+                <p class="modal-text">
+                    No students on this project yet.
+                </p>
+            `;
+
+    modalBody.innerHTML = `
+
+        <p class="modal-eyebrow">
+            ${project.domain} · ${project.status}
+        </p>
+
+        <h2 class="modal-title">
+            ${project.title}
+        </h2>
+
+        <div class="modal-meta-row">
+
+            <div class="modal-meta-item">
+                <span class="meta-label">
+                    Faculty mentor
+                </span>
+
+                <span class="meta-value">
+                    ${project.mentor}
+                </span>
+            </div>
+
+            <div class="modal-meta-item">
+                <span class="meta-label">
+                    Academic year
+                </span>
+
+                <span class="meta-value">
+                    ${project.cohort || "—"}
+                </span>
+            </div>
+
+            <div class="modal-meta-item">
+                <span class="meta-label">
+                    Semester
+                </span>
+
+                <span class="meta-value">
+                    ${project.semester || "—"}
+                </span>
+            </div>
+
+        </div>
+
+        <p class="modal-section-label">
+            Progress
+        </p>
+
+        <p class="modal-text">
+            ${project.progress}% complete
+        </p>
+
+        <p class="modal-section-label">
+            Overview
+        </p>
+
+        <p class="modal-text">
+            ${project.summary || "No description available."}
+        </p>
+
+        <p class="modal-section-label">
+            Expected outcome
+        </p>
+
+        <p class="modal-text">
+            ${project.expectedOutcome || "—"}
+        </p>
+
+        <p class="modal-section-label">
+            Current team
+        </p>
+
+        ${teamHtml}
+    `;
+
+    modalOverlay.classList.remove(
+        "hidden"
+    );
 }
+
+
+function closeModal() {
+
+    modalOverlay.classList.add(
+        "hidden"
+    );
+}
+
+
+document
+    .getElementById("modalClose")
+    ?.addEventListener(
+        "click",
+        closeModal
+    );
+
+
+modalOverlay?.addEventListener(
+    "click",
+    (event) => {
+
+        if (
+            event.target ===
+            modalOverlay
+        ) {
+            closeModal();
+        }
+    }
+);
+
+
+document.addEventListener(
+    "keydown",
+    (event) => {
+
+        if (
+            event.key ===
+            "Escape"
+        ) {
+            closeModal();
+        }
+    }
+);
 
 
 /* ======================================================
-   RENDER: PROFILE
+   PROFILE
 ====================================================== */
 
 function renderProfile() {
-    document.getElementById("profileAvatar").textContent = facultyName.replace("Dr. ", "").charAt(0);
-    document.getElementById("profileName").textContent = facultyName;
-    document.getElementById("profileMeta").textContent = "ILGC Faculty";
-    document.getElementById("profileUserId").textContent = userId;
+
+    const avatar =
+        document.getElementById(
+            "profileAvatar"
+        );
+
+    const name =
+        document.getElementById(
+            "profileName"
+        );
+
+    const meta =
+        document.getElementById(
+            "profileMeta"
+        );
+
+    const profileId =
+        document.getElementById(
+            "profileUserId"
+        );
+
+    if (avatar) {
+
+        avatar.textContent =
+            facultyName
+                .replace("Dr. ", "")
+                .charAt(0)
+                .toUpperCase();
+    }
+
+    if (name) {
+        name.textContent =
+            facultyName;
+    }
+
+    if (meta) {
+
+        meta.textContent =
+            facultyProfile?.designation
+                ? `${facultyProfile.designation} · ILGC Faculty`
+                : "ILGC Faculty";
+    }
+
+    if (profileId) {
+
+        profileId.textContent =
+            facultyEmail;
+    }
 }
 
 
 /* ======================================================
-   DETAIL MODAL (read-only view)
+   SIMPLE PLACEHOLDER SECTIONS
 ====================================================== */
 
-const modalOverlay = document.getElementById("modalOverlay");
-const modalBody = document.getElementById("modalBody");
+function renderIdeas() {
 
-function openDetailModal(projectId) {
-    const project = getAllProjects().find((p) => p.id === projectId);
-    if (!project) return;
+    const list =
+        document.getElementById(
+            "ideasList"
+        );
 
-    const teamHtml = (project.team || []).length
-        ? `<div class="modal-team">${project.team.map((m) => `<span class="team-chip">${m.name} · Sem ${m.semester} · ${yearFromSemester(m.semester)}</span>`).join("")}</div>`
-        : `<p class="modal-text">No students on this project yet.</p>`;
+    const empty =
+        document.getElementById(
+            "ideasEmpty"
+        );
 
-    const isMine = project.mentor === facultyName;
-    const editHtml = isMine
-        ? `<button class="btn btn-primary" data-edit="${project.id}">Edit this project</button>`
-        : "";
+    if (!list || !empty) {
+        return;
+    }
 
-    modalBody.innerHTML = `
-        <p class="modal-eyebrow">${project.domain} · ${project.status}</p>
-        <h2 class="modal-title">${project.title}</h2>
-        <div style="margin-bottom:16px;"><span class="origin-badge origin-${project.origin || "faculty"}">${projectOriginLabel(project)}</span></div>
+    list.innerHTML = "";
 
-        <div class="modal-meta-row">
-            <div class="modal-meta-item">
-                <span class="meta-label">Faculty mentor</span>
-                <span class="meta-value">${project.mentor}</span>
-            </div>
-            <div class="modal-meta-item">
-                <span class="meta-label">Cohort</span>
-                <span class="meta-value">${project.cohort}</span>
-            </div>
-            <div class="modal-meta-item">
-                <span class="meta-label">Progress</span>
-                <span class="meta-value">${project.progress}%</span>
-            </div>
-        </div>
+    empty.classList.remove(
+        "hidden"
+    );
 
-        <p class="modal-section-label">Overview</p>
-        <p class="modal-text">${project.summary}</p>
+    empty.textContent =
+        "Student idea management will be connected to Supabase next.";
+}
 
-        <p class="modal-section-label">Expected outcome</p>
-        <p class="modal-text">${project.expectedOutcome}</p>
 
-        <p class="modal-section-label">Current team</p>
-        ${teamHtml}
+function renderReports() {
 
-        <p class="modal-section-label">SharePoint — shared reports</p>
-        ${sharePointViewHtml(project.id)}
+    const table =
+        document.getElementById(
+            "reportsTable"
+        );
 
-        <div class="modal-actions">
-            ${editHtml}
-        </div>
+    const empty =
+        document.getElementById(
+            "reportsEmpty"
+        );
+
+    if (!table || !empty) {
+        return;
+    }
+
+    table.innerHTML = "";
+
+    empty.classList.remove(
+        "hidden"
+    );
+
+    empty.textContent =
+        "Project report management will be connected to Supabase next.";
+}
+
+
+function renderUnmanaged() {
+
+    const grid =
+        document.getElementById(
+            "unmanagedGrid"
+        );
+
+    const empty =
+        document.getElementById(
+            "unmanagedEmpty"
+        );
+
+    if (!grid || !empty) {
+        return;
+    }
+
+    grid.innerHTML = "";
+
+    empty.classList.remove(
+        "hidden"
+    );
+
+    empty.textContent =
+        "Unmanaged students will be connected to Supabase next.";
+}
+
+
+function renderTags() {
+
+    const list =
+        document.getElementById(
+            "tagManageList"
+        );
+
+    if (!list) {
+        return;
+    }
+
+    list.innerHTML = `
+        <p class="empty-state">
+            Project tags will be connected to Supabase next.
+        </p>
     `;
-
-    modalOverlay.classList.remove("hidden");
 }
-
-function closeModal() {
-    modalOverlay.classList.add("hidden");
-}
-
-document.getElementById("modalClose").addEventListener("click", closeModal);
-modalOverlay.addEventListener("click", (e) => { if (e.target === modalOverlay) closeModal(); });
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
 
 
 /* ======================================================
-   FORM MODAL (float new / edit)
+   NOTIFICATIONS
 ====================================================== */
 
-function slugify(title) {
-    const base = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    return `${base || "project"}-${Date.now().toString(36).slice(-4)}`;
+function renderNotifications() {
+
+    const list =
+        document.getElementById(
+            "notificationsList"
+        );
+
+    if (!list) {
+        return;
+    }
+
+    list.innerHTML = `
+
+        <div class="notification-item">
+
+            <span class="notification-icon">
+                👤
+            </span>
+
+            <span class="notification-text">
+
+                Faculty account loaded successfully.
+
+                <span class="notification-date">
+                    ${facultyEmail}
+                </span>
+
+            </span>
+
+        </div>
+
+        <div class="notification-item">
+
+            <span class="notification-icon">
+                📁
+            </span>
+
+            <span class="notification-text">
+
+                ${myProjectsData.length}
+                project${myProjectsData.length !== 1 ? "s" : ""}
+                assigned to you.
+
+            </span>
+
+        </div>
+    `;
 }
 
-function openFormModal(projectId) {
-    const editing = Boolean(projectId);
-    const project = editing ? getAllProjects().find((p) => p.id === projectId) : null;
 
-    modalBody.innerHTML = `
-        <p class="modal-eyebrow">${editing ? "Edit project" : "Float new project"}</p>
-        <h2 class="modal-title">${editing ? project.title : "New Project"}</h2>
+function renderNotifBadge() {
 
-        <form id="projectForm">
-            <div class="modal-field">
-                <label for="fTitle">Project name</label>
-                <input type="text" id="fTitle" required value="${editing ? project.title : ""}">
-            </div>
+    const badge =
+        document.getElementById(
+            "notifBadge"
+        );
 
-            <div class="modal-field">
-                <label for="fDomain">Domain</label>
-                <select id="fDomain">
-                    ${FORM_DOMAINS.map((d) => `<option value="${d}" ${editing && project.domain === d ? "selected" : ""}>${d}</option>`).join("")}
-                </select>
-            </div>
+    if (!badge) {
+        return;
+    }
 
-            <div class="modal-field">
-                <label for="fStatus">Status</label>
-                <select id="fStatus">
-                    ${FORM_STATUSES.map((s) => `<option value="${s}" ${editing && project.status === s ? "selected" : ""}>${s}</option>`).join("")}
-                </select>
-            </div>
-
-            <div class="modal-field">
-                <label for="fSummary">Summary</label>
-                <textarea id="fSummary" required>${editing ? project.summary : ""}</textarea>
-            </div>
-
-            <div class="modal-field">
-                <label for="fOutcome">Expected outcome</label>
-                <textarea id="fOutcome" required>${editing ? project.expectedOutcome : ""}</textarea>
-            </div>
-
-            <div class="modal-field">
-                <label>Tags</label>
-                <div class="tag-picker" id="fTagPicker">
-                    ${loadTags().map((t) => `<span class="tag-picker-option" data-tag-toggle="${t}" data-active="${editing && (project.tags || []).includes(t)}">${t}</span>`).join("")}
-                </div>
-            </div>
-
-            <div class="modal-actions">
-                <button type="submit" class="btn btn-primary">${editing ? "Save changes" : "Float project"}</button>
-                ${editing ? `<button type="button" class="btn btn-danger" data-delete="${projectId}">Delete project</button>` : ""}
-            </div>
-        </form>
-    `;
-
-    modalOverlay.classList.remove("hidden");
-
-    document.getElementById("fTagPicker").addEventListener("click", (e) => {
-        const opt = e.target.closest("[data-tag-toggle]");
-        if (!opt) return;
-        opt.dataset.active = String(opt.dataset.active !== "true");
-    });
-
-    document.getElementById("projectForm").addEventListener("submit", (e) => {
-        e.preventDefault();
-
-        const selectedTags = Array.from(document.querySelectorAll("#fTagPicker [data-active='true']")).map((el) => el.dataset.tagToggle);
-
-        const fields = {
-            title: document.getElementById("fTitle").value.trim(),
-            domain: document.getElementById("fDomain").value,
-            status: document.getElementById("fStatus").value,
-            summary: document.getElementById("fSummary").value.trim(),
-            expectedOutcome: document.getElementById("fOutcome").value.trim(),
-            tags: selectedTags
-        };
-
-        if (editing) {
-            editProject(projectId, fields);
-            showToast("Project updated ✓");
-        } else {
-            addProject({
-                id: slugify(fields.title),
-                mentor: facultyName,
-                cohort: "Batch of 2029",
-                image: "images/placeholder.jpg",
-                progress: fields.status === "Completed" ? 100 : fields.status === "Ongoing" ? 15 : 0,
-                team: [],
-                origin: "faculty",
-                floatedByName: facultyName,
-                ...fields
-            });
-            showToast("Project floated ✓");
-        }
-
-        closeModal();
-        renderAll();
-    });
+    badge.classList.add(
+        "hidden"
+    );
 }
 
 
@@ -1388,212 +2107,354 @@ function openFormModal(projectId) {
    EVENT DELEGATION
 ====================================================== */
 
-document.getElementById("floatProjectBtn").addEventListener("click", () => openFormModal(null));
+document.addEventListener(
+    "click",
+    (event) => {
 
-document.getElementById("projectsStatusChips").addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-project-status]");
-    if (!btn) return;
-    projectsActiveStatus = btn.dataset.projectStatus;
-    renderProjectsChips();
-    renderMyProjects();
-});
+        const openButton =
+            event.target.closest(
+                "[data-open]"
+            );
 
-document.getElementById("projectsYearSelect").addEventListener("change", (e) => {
-    projectsActiveYear = e.target.value;
-    renderMyProjects();
-});
+        if (openButton) {
 
-document.getElementById("discoverStatusChips").addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-discover-status]");
-    if (!btn) return;
-    discoverStatus = btn.dataset.discoverStatus;
-    renderDiscoverChips();
-    renderDiscover();
-});
+            openDetailModal(
+                openButton.dataset.open
+            );
 
-document.getElementById("discoverDomainChips").addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-discover-domain]");
-    if (!btn) return;
-    discoverDomain = btn.dataset.discoverDomain;
-    renderDiscoverChips();
-    renderDiscover();
-});
-
-document.getElementById("discoverSearch").addEventListener("input", (e) => {
-    discoverSearch = e.target.value.trim();
-    renderDiscover();
-});
-
-document.getElementById("discoverMentorSelect").addEventListener("change", (e) => {
-    discoverMentor = e.target.value;
-    renderDiscover();
-});
-
-document.getElementById("ideasStatusChips").addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-idea-status]");
-    if (!btn) return;
-    ideasActiveStatus = btn.dataset.ideaStatus;
-    renderIdeasChips();
-    renderIdeas();
-});
-
-document.getElementById("reportsStatusChips").addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-report-status]");
-    if (!btn) return;
-    reportsActiveStatus = btn.dataset.reportStatus;
-    renderReportsChips();
-    renderReports();
-});
-
-document.getElementById("newTagForm").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const input = document.getElementById("newTagInput");
-    const value = input.value.trim();
-    if (!value) return;
-    addTag(value);
-    input.value = "";
-    showToast("Tag added ✓");
-    renderTags();
-});
-
-document.addEventListener("click", (e) => {
-    const openBtn = e.target.closest("[data-open]");
-    if (openBtn) { openDetailModal(openBtn.dataset.open); return; }
-
-    const editBtn = e.target.closest("[data-edit]");
-    if (editBtn) { openFormModal(editBtn.dataset.edit); return; }
-
-    const deleteBtn = e.target.closest("[data-delete]");
-    if (deleteBtn) {
-        const project = getAllProjects().find((p) => p.id === deleteBtn.dataset.delete);
-        const title = project ? project.title : "this project";
-        if (confirm(`Delete "${title}"? This removes it from all portals and can't be undone.`)) {
-            deleteProject(deleteBtn.dataset.delete);
-            closeModal();
-            showToast("Project deleted");
-            renderAll();
+            return;
         }
-        return;
-    }
 
-    const acceptBtn = e.target.closest("[data-accept]");
-    if (acceptBtn) {
-        const [studentUserId, projectId] = acceptBtn.dataset.accept.split("|");
-        acceptInterest(studentUserId, projectId);
-        return;
-    }
 
-    const rejectBtn = e.target.closest("[data-reject]");
-    if (rejectBtn) {
-        const [studentUserId, projectId] = rejectBtn.dataset.reject.split("|");
-        rejectInterest(studentUserId, projectId);
-        return;
-    }
+        const gotoButton =
+            event.target.closest(
+                "[data-goto]"
+            );
 
-    const gotoBtn = e.target.closest("[data-goto]");
-    if (gotoBtn) { goToTab(gotoBtn.dataset.goto); return; }
+        if (gotoButton) {
 
-    const ideaAccept = e.target.closest("[data-idea-accept]");
-    if (ideaAccept) { openIdeaDecisionModal(ideaAccept.dataset.ideaAccept, "Accepted"); return; }
+            goToTab(
+                gotoButton.dataset.goto
+            );
 
-    const ideaReject = e.target.closest("[data-idea-reject]");
-    if (ideaReject) { openIdeaDecisionModal(ideaReject.dataset.ideaReject, "Rejected"); return; }
-
-    const ideaRevise = e.target.closest("[data-idea-revise]");
-    if (ideaRevise) { openIdeaDecisionModal(ideaRevise.dataset.ideaRevise, "Needs Revision"); return; }
-
-    const reportOpen = e.target.closest("[data-report-open]");
-    if (reportOpen) { openReportDetailModal(reportOpen.dataset.reportOpen); return; }
-
-    const reportApprove = e.target.closest("[data-report-approve]");
-    if (reportApprove) { approveReport(reportApprove.dataset.reportApprove); return; }
-
-    const reportRequestChanges = e.target.closest("[data-report-request-changes]");
-    if (reportRequestChanges) { requestReportChanges(reportRequestChanges.dataset.reportRequestChanges); return; }
-
-    const unmanagedProfile = e.target.closest("[data-unmanaged-profile]");
-    if (unmanagedProfile) { openUnmanagedProfileModal(unmanagedProfile.dataset.unmanagedProfile); return; }
-
-    const unmanagedAssign = e.target.closest("[data-unmanaged-assign]");
-    if (unmanagedAssign) { openAssignModal(unmanagedAssign.dataset.unmanagedAssign); return; }
-
-    const unmanagedEmail = e.target.closest("[data-unmanaged-email]");
-    if (unmanagedEmail) { emailStudent(unmanagedEmail.dataset.unmanagedEmail); return; }
-
-    const tagEdit = e.target.closest("[data-tag-edit]");
-    if (tagEdit) { startEditTag(tagEdit.dataset.tagEdit); return; }
-
-    const tagRemove = e.target.closest("[data-tag-remove]");
-    if (tagRemove) {
-        if (confirm(`Remove the "${tagRemove.dataset.tagRemove}" tag? It will be unassigned from any projects using it.`)) {
-            removeTag(tagRemove.dataset.tagRemove);
-            showToast("Tag removed");
-            renderTags();
-            renderMyProjects();
+            return;
         }
-        return;
+
+
+        const studentButton =
+            event.target.closest(
+                "[data-student-email]"
+            );
+
+        if (studentButton) {
+
+            openStudentModal(
+                studentButton.dataset.studentEmail
+            );
+
+            return;
+        }
     }
-});
+);
 
 
 /* ======================================================
-   RENDER ALL / INIT
+   FILTER EVENTS
 ====================================================== */
 
-function renderAll() {
+document
+    .getElementById(
+        "projectsStatusChips"
+    )
+    ?.addEventListener(
+        "click",
+        (event) => {
+
+            const button =
+                event.target.closest(
+                    "[data-project-status]"
+                );
+
+            if (!button) {
+                return;
+            }
+
+            projectsActiveStatus =
+                button.dataset.projectStatus;
+
+            renderProjectsChips();
+            renderMyProjects();
+        }
+    );
+
+
+document
+    .getElementById(
+        "projectsYearSelect"
+    )
+    ?.addEventListener(
+        "change",
+        (event) => {
+
+            projectsActiveSemester =
+                event.target.value;
+
+            renderMyProjects();
+        }
+    );
+
+
+document
+    .getElementById(
+        "discoverStatusChips"
+    )
+    ?.addEventListener(
+        "click",
+        (event) => {
+
+            const button =
+                event.target.closest(
+                    "[data-discover-status]"
+                );
+
+            if (!button) {
+                return;
+            }
+
+            discoverStatus =
+                button.dataset.discoverStatus;
+
+            renderDiscoverChips();
+            renderDiscover();
+        }
+    );
+
+
+document
+    .getElementById(
+        "discoverDomainChips"
+    )
+    ?.addEventListener(
+        "click",
+        (event) => {
+
+            const button =
+                event.target.closest(
+                    "[data-discover-domain]"
+                );
+
+            if (!button) {
+                return;
+            }
+
+            discoverDomain =
+                button.dataset.discoverDomain;
+
+            renderDiscoverChips();
+            renderDiscover();
+        }
+    );
+
+
+document
+    .getElementById(
+        "discoverSearch"
+    )
+    ?.addEventListener(
+        "input",
+        (event) => {
+
+            discoverSearch =
+                event.target.value
+                    .trim();
+
+            renderDiscover();
+        }
+    );
+
+
+document
+    .getElementById(
+        "discoverMentorSelect"
+    )
+    ?.addEventListener(
+        "change",
+        (event) => {
+
+            discoverMentor =
+                event.target.value;
+
+            renderDiscover();
+        }
+    );
+
+
+/* ======================================================
+   SIDEBAR
+====================================================== */
+
+const SIDEBAR_STATE_KEY =
+    "ilgc_sidebar_collapsed";
+
+if (
+    localStorage.getItem(
+        SIDEBAR_STATE_KEY
+    ) === "true"
+) {
+
+    document.body.classList.add(
+        "sidebar-collapsed"
+    );
+}
+
+
+const sidebarToggleBtn =
+    document.getElementById(
+        "sidebarToggle"
+    );
+
+
+if (sidebarToggleBtn) {
+
+    sidebarToggleBtn.addEventListener(
+        "click",
+        () => {
+
+            document.body.classList.toggle(
+                "sidebar-collapsed"
+            );
+
+            localStorage.setItem(
+                SIDEBAR_STATE_KEY,
+                document.body.classList.contains(
+                    "sidebar-collapsed"
+                )
+            );
+        }
+    );
+}
+
+
+/* ======================================================
+   INITIALIZE
+====================================================== */
+
+async function initializeFacultyDashboard() {
+
+    console.log(
+        "Initializing ILGC Faculty Dashboard..."
+    );
+
+    const profileLoaded =
+        await loadFacultyProfile();
+
+    if (!profileLoaded) {
+
+        console.error(
+            "Faculty profile could not be loaded."
+        );
+
+        return;
+    }
+
+
+    /* ----------------------------------------------
+       Load all projects
+    ---------------------------------------------- */
+
+    let allProjects =
+        await loadAllProjects();
+
+    allProjects =
+        await loadProjectDomains(
+            allProjects
+        );
+
+    allProjects =
+        await loadProjectMentors(
+            allProjects
+        );
+
+
+    /* ----------------------------------------------
+       Load faculty projects
+    ---------------------------------------------- */
+
+    let myProjects =
+        await loadMyProjects();
+
+    myProjects =
+        await loadProjectDomains(
+            myProjects
+        );
+
+    myProjects =
+        await loadProjectMentors(
+            myProjects
+        );
+
+
+    allProjectsData =
+        allProjects;
+
+    myProjectsData =
+        myProjects;
+
+
+    console.log(
+        "All projects from Supabase:",
+        allProjectsData
+    );
+
+    console.log(
+        "My projects from Supabase:",
+        myProjectsData
+    );
+
+
+    /* ----------------------------------------------
+       Load students
+    ---------------------------------------------- */
+
+    interestedStudentsData =
+        await loadInterestedStudents();
+
+
+    console.log(
+        "Students in my projects:",
+        interestedStudentsData
+    );
+
+
+    /* ----------------------------------------------
+       Render
+    ---------------------------------------------- */
+
+    renderProjectsChips();
+    renderProjectsSemesterFilter();
+
+    renderDiscoverChips();
+
     renderHome();
     renderMyProjects();
     renderDiscover();
-    renderIdeas();
     renderStudents();
+
+    renderIdeas();
     renderReports();
     renderUnmanaged();
     renderTags();
+
     renderNotifications();
     renderNotifBadge();
-}
 
-async function initializeFacultyDashboard() {
-    const profileLoaded = await loadFacultyProfile();
-
-    if (!profileLoaded) {
-        console.error(
-            "Faculty dashboard could not load the faculty profile."
-        );
-        return;
-    }
-
-    renderProjectsChips();
-    renderProjectsYearFilter();
-    renderDiscoverChips();
-    renderIdeasChips();
-    renderReportsChips();
-    renderUnmanagedFilters();
     renderProfile();
-    renderAll();
+
+
+    console.log(
+        "ILGC Faculty Dashboard loaded successfully."
+    );
 }
+
 
 initializeFacultyDashboard();
-
-
-/* ======================================================
-   SIDEBAR TOGGLE
-   Sections used to be a horizontally-scrolling row of tabs
-   up top; they now live in a left sidebar that can be
-   hidden/shown with the header toggle. State is remembered
-   per browser so it stays out of the way once dismissed.
-====================================================== */
-
-const SIDEBAR_STATE_KEY = "ilgc_sidebar_collapsed";
-
-if (localStorage.getItem(SIDEBAR_STATE_KEY) === "true") {
-    document.body.classList.add("sidebar-collapsed");
-}
-
-const sidebarToggleBtn = document.getElementById("sidebarToggle");
-if (sidebarToggleBtn) {
-    sidebarToggleBtn.addEventListener("click", () => {
-        document.body.classList.toggle("sidebar-collapsed");
-        localStorage.setItem(SIDEBAR_STATE_KEY, document.body.classList.contains("sidebar-collapsed"));
-    });
-}
