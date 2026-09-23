@@ -313,3 +313,15 @@
     font-size: 13px;
     overflow-wrap: anywhere;
 }
+.project-meta {
+    margin: 8px 0 12px;
+    color: #6b8087;
+    font-size: 14px;
+}
+
+.project-description {
+    margin: 0 0 20px;
+    color: #5f747b;
+    font-size: 14px;
+    line-height: 1.6;
+}
