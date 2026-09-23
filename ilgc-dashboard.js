@@ -353,7 +353,9 @@ function renderHome() {
         `Mentor · ${userId}`;
 
     const groups = mentorGroups || [];
-    const activeProjects = projects.filter((p) => p.status === "Ongoing").length;
+    const activeProjects = mentorGroups.reduce(
+    (total, group) => total + group.students.length,
+    0);
     const pendingInterests = getAllInterestsAcrossStudents().filter((i) => i.status === "Pending");
     const pendingProposals = getAllIdeas().filter((i) => i.status === "Pending" || i.status === "Needs Revision");
     const reportsToReview = getAllReports().filter((r) => r.status === "Submitted" || r.status === "Under Review" || r.status === "Resubmitted");
