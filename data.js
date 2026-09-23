@@ -233,22 +233,109 @@ function saveProjectOverlay(overlay) {
     localStorage.setItem(PROJECT_OVERLAY_KEY, JSON.stringify(overlay));
 }
 
+let SUPABASE_PROJECTS = [];
+let SUPABASE_PROJECTS_LOADED = false;
+
 function getAllProjects() {
     const overlay = loadProjectOverlay();
     const deleted = new Set(overlay.deleted || []);
 
-    const base = PROJECTS.map((project) => ({
-        origin: "faculty",          // base projects were floated by faculty
+    // Use Supabase projects once they have loaded.
+    // Keep PROJECTS as temporary fallback while loading.
+    const sourceProjects = SUPABASE_PROJECTS_LOADED
+        ? SUPABASE_PROJECTS
+        : PROJECTS;
+
+    const base = sourceProjects.map((project) => ({
+        origin: "faculty",
         ...project,
         ...(overlay.edited[project.id] || {})
     }));
 
-    // Ensure every project (including overlay-added ones) carries an origin,
-    // and drop anything that has been deleted.
     return [...base, ...overlay.added]
         .map((p) => ({ origin: "faculty", ...p }))
         .filter((p) => !deleted.has(p.id));
 }
+
+function formatProjectStatus(status) {
+    const map = {
+        proposed: "Proposed",
+        ongoing: "Ongoing",
+        completed: "Completed"
+    };
+
+    return map[String(status || "").toLowerCase()] || status || "Proposed";
+}
+
+async function loadProjectsFromSupabase() {
+    if (!window.supabaseClient) {
+        console.error("Supabase client is not available.");
+        return;
+    }
+
+    const { data, error } = await window.supabaseClient
+        .from("projects")
+        .select(`
+            project_code,
+            title,
+            description,
+            summary,
+            expected_outcome,
+            domain_id,
+            status,
+            progress,
+            academic_year,
+            image_url,
+            created_by,
+            created_at,
+            updated_at,
+            semester
+        `)
+        .order("created_at", { ascending: false });
+
+    if (error) {
+        console.error("Error loading projects from Supabase:", error);
+        return;
+    }
+
+    SUPABASE_PROJECTS = (data || []).map((project) => ({
+        id: project.project_code,
+        title: project.title,
+        domain: project.domain_id || "Unassigned",
+        status: formatProjectStatus(project.status),
+        summary: project.summary || project.description || "",
+        description: project.description || "",
+        expectedOutcome: project.expected_outcome || "",
+        progress: Number(project.progress || 0),
+        mentor: project.created_by || "—",
+        cohort: project.academic_year || "—",
+        semester: project.semester,
+        image: project.image_url || "",
+        team: [],
+        tags: [],
+        origin: "faculty",
+        floatedByName: project.created_by || ""
+    }));
+
+    SUPABASE_PROJECTS_LOADED = true;
+
+    console.log("Projects loaded from Supabase:", SUPABASE_PROJECTS);
+
+    // Refresh dashboard after Supabase finishes loading
+    if (typeof renderAll === "function") {
+        renderAll();
+    }
+
+    if (typeof renderDiscoverChips === "function") {
+        renderDiscoverChips();
+    }
+
+    if (typeof renderProjectsChips === "function") {
+        renderProjectsChips();
+    }
+}
+
+loadProjectsFromSupabase();
 
 function addProject(project) {
     const overlay = loadProjectOverlay();
