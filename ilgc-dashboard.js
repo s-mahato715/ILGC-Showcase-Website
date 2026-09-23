@@ -46,6 +46,115 @@ async function loadMentorName() {
         mentorProfileState.name = mentor.name;
     }
 }
+/* ======================================================
+   LOAD MENTOR GROUPS FROM SUPABASE
+====================================================== */
+
+let mentorGroups = [];
+
+async function loadMentorGroups() {
+    console.log("Loading groups for mentor:", userId);
+
+    // Get the projects assigned to the logged-in mentor
+    const { data: mentorProjects, error: mentorProjectsError } =
+        await window.supabaseClient
+            .from("project_mentors")
+            .select("project_code")
+            .eq("mentor_email", userId);
+
+    if (mentorProjectsError) {
+        console.error("Could not load mentor projects:", mentorProjectsError);
+        mentorGroups = [];
+        return;
+    }
+
+    console.log("Mentor projects:", mentorProjects);
+
+    if (!mentorProjects || mentorProjects.length === 0) {
+        mentorGroups = [];
+        return;
+    }
+
+    const projectCodes = mentorProjects.map((p) => p.project_code);
+
+    // Get active students belonging to those projects
+    const { data: members, error: membersError } =
+        await window.supabaseClient
+            .from("project_members")
+            .select(`
+                project_code,
+                student_email,
+                member_role,
+                joined_at,
+                left_at
+            `)
+            .in("project_code", projectCodes)
+            .is("left_at", null)
+            .order("project_code")
+            .order("student_email");
+
+    if (membersError) {
+        console.error("Could not load project members:", membersError);
+        mentorGroups = [];
+        return;
+    }
+
+    console.log("Mentor project members:", members);
+
+    if (!members || members.length === 0) {
+        mentorGroups = projectCodes.map((projectCode) => ({
+            projectCode,
+            students: []
+        }));
+        return;
+    }
+
+    // Get the student names from users
+    const studentEmails = [...new Set(
+        members.map((member) => member.student_email)
+    )];
+
+    const { data: students, error: studentsError } =
+        await window.supabaseClient
+            .from("users")
+            .select("email, name")
+            .in("email", studentEmails);
+
+    if (studentsError) {
+        console.error("Could not load student names:", studentsError);
+        mentorGroups = [];
+        return;
+    }
+
+    const studentMap = new Map(
+        (students || []).map((student) => [
+            student.email,
+            student
+        ])
+    );
+
+    mentorGroups = projectCodes.map((projectCode) => {
+        const projectMembers = members.filter(
+            (member) => member.project_code === projectCode
+        );
+
+        return {
+            projectCode,
+            students: projectMembers.map((member) => {
+                const student = studentMap.get(member.student_email);
+
+                return {
+                    email: member.student_email,
+                    name: student?.name || member.student_email,
+                    role: member.member_role,
+                    joinedAt: member.joined_at
+                };
+            })
+        };
+    });
+
+    console.log("Final mentor groups:", mentorGroups);
+}
 
 
 /* ======================================================
@@ -322,24 +431,53 @@ function renderGroupsYearFilter() {
 }
 
 function renderGroups() {
-    const projects = getAllProjects().filter(
-        (p) => (groupsActiveStatus === "All" || p.status === groupsActiveStatus) &&
-               projectHasYear(p, groupsActiveYear)
-    );
-
     const grid = document.getElementById("groupsGrid");
     const empty = document.getElementById("groupsEmpty");
 
-    if (projects.length === 0) {
+    if (!mentorGroups || mentorGroups.length === 0) {
         grid.innerHTML = "";
         empty.classList.remove("hidden");
         return;
     }
 
     empty.classList.add("hidden");
-    grid.innerHTML = projects.map(groupCardHtml).join("");
-}
 
+    grid.innerHTML = mentorGroups.map((group) => {
+        const studentCount = group.students.length;
+
+        const studentsHtml = studentCount
+            ? group.students.map((student) => `
+                <div class="team-chip">
+                    ${student.name}
+                    <span style="opacity:0.7;">· ${student.email}</span>
+                </div>
+            `).join("")
+            : `<p class="modal-text">No students in this group yet.</p>`;
+
+        return `
+            <article class="group-card">
+                <div class="group-card-top">
+                    <span class="project-domain">Project</span>
+                    <span class="badge badge-ongoing">
+                        ${studentCount} student${studentCount !== 1 ? "s" : ""}
+                    </span>
+                </div>
+
+                <div class="group-card-body">
+                    <h3 class="group-title">${group.projectCode}</h3>
+
+                    <p class="group-mentor">
+                        Students who chose this project
+                    </p>
+
+                    <div class="modal-team" style="margin-top:16px;">
+                        ${studentsHtml}
+                    </div>
+                </div>
+            </article>
+        `;
+    }).join("");
+}
 function openGroupDetailModal(projectId) {
     const project = getAllProjects().find((p) => p.id === projectId);
     if (!project) return;
@@ -1184,6 +1322,7 @@ document.addEventListener("click", (e) => {
 
 async function renderAll() {
     await loadMentorName();
+    await loadMentorGroups();
 
     renderHome();
     renderGroups();
