@@ -431,7 +431,7 @@ function renderHome() {
     const groups = mentorGroups || [];
     const activeProjects = mentorGroups.length;
     const pendingInterests = getAllInterestsAcrossStudents().filter((i) => i.status === "Pending");
-    const pendingProposals = getAllIdeas().filter((i) => i.status === "Pending" || i.status === "Needs Revision");
+    const pendingProposals = getProposals().filter((i) => i.status === "Pending" || i.status === "Needs Revision");
     const reportsToReview = getAllReports().filter((r) => r.status === "Submitted" || r.status === "Under Review" || r.status === "Resubmitted");
 
     document.getElementById("statRow").innerHTML = `
@@ -472,20 +472,6 @@ function renderHome() {
             </div>
         `).join("")
         : `<p class="empty-panel">Nothing needs your attention right now.</p>`;
-
-    const activity = buildActivityFeed(6);
-    document.getElementById("activityFeed").innerHTML = activity.length
-        ? activity.map((e) => `
-            <div class="activity-item">
-                <span class="activity-dot"></span>
-                <span>${e.text}<span class="activity-date">${e.date}</span></span>
-            </div>
-        `).join("")
-        : `<p class="empty-panel">No recent activity yet.</p>`;
-
-    document.getElementById("homeGroupGrid").innerHTML =
-        groups.slice(0, 6).map(groupCardHtml).join("") ||
-        `<p class="empty-state">No active groups yet.</p>`;
 
     renderNotifBadge();
 }
@@ -795,6 +781,98 @@ function rejectInterest(studentUserId, projectId) {
    RENDER: PROJECT PROPOSALS (institute-wide ideas)
 ====================================================== */
 
+/* ------------------------------------------------------
+   PROPOSALS: loaded from Supabase (project_proposals).
+   No placeholder ideas.
+------------------------------------------------------ */
+let supabaseProposals = [];
+
+function statusLabel(raw) {
+    return String(raw || "pending")
+        .split(/[_\s]+/)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(" ");
+}
+
+function parseProposalText(text) {
+    const t = String(text || "");
+    const m = t.match(/^Problem:\s*([\s\S]*?)\n\s*\nScope:\s*([\s\S]*)$/);
+    return m ? { problem: m[1].trim(), scope: m[2].trim() } : { problem: t, scope: "" };
+}
+
+async function loadProposals() {
+    const { data, error } = await window.supabaseClient
+        .from("project_proposals")
+        .select("*");
+
+    if (error) {
+        console.error("Could not load proposals:", error);
+        supabaseProposals = [];
+        return;
+    }
+
+    const rows = data || [];
+    const emails = [...new Set(rows.flatMap((r) => [
+        r.student_email, r.proposed_by, r.created_by, r.mentor_email, r.target_mentor_email
+    ]).filter(Boolean))];
+
+    let userRows = [];
+    let semRows = [];
+    if (emails.length > 0) {
+        const { data: u } = await window.supabaseClient
+            .from("users").select("email, name").in("email", emails);
+        userRows = u || [];
+        const { data: sp } = await window.supabaseClient
+            .from("student_profiles").select("email, semester").in("email", emails);
+        semRows = sp || [];
+    }
+    const nameByEmail = new Map(userRows.map((u) => [u.email, u.name]));
+    const semByEmail = new Map(semRows.map((p) => [p.email, p.semester]));
+
+    supabaseProposals = rows.map((r) => {
+        const studentEmail = r.student_email || r.proposed_by || r.created_by || "";
+        const mentorEmail = r.mentor_email || r.target_mentor_email || "";
+        const idCol = ("proposal_id" in r) ? "proposal_id" : "id";
+        const parsed = parseProposalText(r.description || r.problem_statement || "");
+        return {
+            id: String(r[idCol]),
+            _idCol: idCol,
+            _rawId: r[idCol],
+            title: r.title || "Untitled idea",
+            studentName: nameByEmail.get(studentEmail) || studentEmail || "A student",
+            studentSemester: semByEmail.get(studentEmail) ?? "—",
+            domain: r.domain || r.domain_name || "General",
+            targetMentor: nameByEmail.get(mentorEmail) || mentorEmail || "a mentor",
+            proposedDate: String(r.created_at || r.proposed_at || r.submitted_at || "").slice(0, 10),
+            status: statusLabel(r.status),
+            problemStatement: r.problem_statement || parsed.problem,
+            scope: r.scope || parsed.scope,
+            tags: Array.isArray(r.tags) ? r.tags : [],
+            feedback: r.mentor_feedback || r.feedback || ""
+        };
+    });
+    console.log("Proposals from Supabase:", supabaseProposals);
+}
+
+function getProposals() {
+    return supabaseProposals;
+}
+
+/* ------------------------------------------------------
+   REPORTS: there is no reports table in Supabase yet, so the
+   hardcoded sample reports from data.js are NOT shown. Only
+   reports added through "+ Add Report" (kept in this browser)
+   appear here.
+------------------------------------------------------ */
+function getAllReports() {
+    const overlay = loadReportOverlay();
+    return (overlay.added || []).map((r) => ({
+        ...r,
+        comments: r.comments || [],
+        history: r.history || []
+    }));
+}
+
 let proposalsActiveStatus = "All";
 let proposalsActiveDomain = "All";
 
@@ -806,7 +884,7 @@ function renderProposalsChips() {
 }
 
 function renderProposalsDomainFilter() {
-    const domains = ["All", ...new Set(STUDENT_IDEAS.map((i) => i.domain))];
+    const domains = ["All", ...new Set(getProposals().map((i) => i.domain))];
     document.getElementById("proposalsDomainFilter").innerHTML = `
         <select id="proposalsDomainSelect">
             ${domains.map((d) => `<option value="${d}" ${d === proposalsActiveDomain ? "selected" : ""}>${d === "All" ? "All Domains" : d}</option>`).join("")}
@@ -858,7 +936,7 @@ function proposalCardHtml(idea) {
 }
 
 function renderProposals() {
-    const ideas = getAllIdeas()
+    const ideas = getProposals()
         .filter((i) => proposalsActiveStatus === "All" || i.status === proposalsActiveStatus)
         .filter((i) => proposalsActiveDomain === "All" || i.domain === proposalsActiveDomain)
         .sort((a, b) => new Date(b.proposedDate) - new Date(a.proposedDate));
@@ -877,7 +955,7 @@ function renderProposals() {
 }
 
 function openProposalDecisionModal(ideaId, decision) {
-    const idea = getAllIdeas().find((i) => i.id === ideaId);
+    const idea = getProposals().find((i) => i.id === ideaId);
     if (!idea) return;
 
     const titleMap = { Accepted: "Accept proposal", Rejected: "Reject proposal", "Needs Revision": "Request changes" };
@@ -901,10 +979,25 @@ function openProposalDecisionModal(ideaId, decision) {
 
     modalOverlay.classList.remove("hidden");
 
-    document.getElementById("proposalDecisionForm").addEventListener("submit", (e) => {
+    document.getElementById("proposalDecisionForm").addEventListener("submit", async (e) => {
         e.preventDefault();
         const comment = document.getElementById("proposalComment").value.trim();
-        updateIdea(ideaId, { status: decision, feedback: comment || idea.feedback || "" });
+
+        const { error } = await window.supabaseClient
+            .from("project_proposals")
+            .update({
+                status: decision.toLowerCase().replace(/\s+/g, "_"),
+                mentor_feedback: comment || idea.feedback || ""
+            })
+            .eq(idea._idCol, idea._rawId);
+
+        if (error) {
+            console.error("Could not update proposal:", error);
+            showToast("Could not save decision — check console");
+            return;
+        }
+
+        await loadProposals();
 
         const toastMap = {
             Accepted: `"${idea.title}" accepted ✓`,
@@ -913,6 +1006,7 @@ function openProposalDecisionModal(ideaId, decision) {
         };
         showToast(toastMap[decision]);
         closeModal();
+        renderProposalsDomainFilter();
         renderProposals();
         renderHome();
     });
@@ -948,7 +1042,7 @@ function renderReports() {
 
     empty.classList.add("hidden");
 
-    const allProjects = getAllProjects();
+    const allProjects = mentorGroups;
 
     const rows = reports.map((report) => {
         const project = allProjects.find((p) => p.id === report.projectId);
@@ -981,7 +1075,7 @@ function openReportDetailModal(reportId) {
     const report = getAllReports().find((r) => r.id === reportId);
     if (!report) return;
 
-    const project = getAllProjects().find((p) => p.id === report.projectId) || {};
+    const project = mentorGroups.find((p) => p.id === report.projectId) || {};
     const team = project.team || [];
 
     const timelineHtml = REPORT_TIMELINE.map((step) => {
@@ -1097,7 +1191,7 @@ function requestReportChanges(reportId) {
 }
 
 function openAddReportModal() {
-    const projects = getAllProjects();
+    const projects = mentorGroups;
 
     modalBody.innerHTML = `
         <p class="modal-eyebrow">Add report</p>
@@ -1275,7 +1369,7 @@ function buildNotifications() {
         });
     });
 
-    getAllIdeas().filter((i) => i.status === "Pending").forEach((i) => {
+    getProposals().filter((i) => i.status === "Pending").forEach((i) => {
         notifications.push({
             icon: "💡",
             date: i.proposedDate,
@@ -1284,7 +1378,7 @@ function buildNotifications() {
     });
 
     getAllReports().filter((r) => r.status === "Submitted" || r.status === "Under Review" || r.status === "Resubmitted").forEach((r) => {
-        const project = getAllProjects().find((p) => p.id === r.projectId);
+        const project = mentorGroups.find((p) => p.id === r.projectId);
         notifications.push({
             icon: "📄",
             date: r.submittedDate,
@@ -1454,7 +1548,9 @@ document.addEventListener("click", (e) => {
 async function renderAll() {
     await loadMentorName();
     await loadMentorGroups();
+    await loadProposals();
 
+    renderProposalsDomainFilter();
     renderHome();
     renderGroups();
     renderInterest();
