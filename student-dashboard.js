@@ -192,9 +192,37 @@ async function loadStudentProjects() {
         ])
     );
 
+    // 4b. Get mentor names for these projects
+    const { data: mentorRows } =
+        await window.supabaseClient
+            .from("project_mentors")
+            .select("project_code, mentor_email")
+            .in("project_code", projectCodes);
+
+    const mentorEmailList = [
+        ...new Set((mentorRows || []).map((m) => m.mentor_email).filter(Boolean))
+    ];
+    let mentorUserRows = [];
+    if (mentorEmailList.length > 0) {
+        const { data } = await window.supabaseClient
+            .from("users")
+            .select("email, name")
+            .in("email", mentorEmailList);
+        mentorUserRows = data || [];
+    }
+    const mentorNameByEmail = new Map(mentorUserRows.map((u) => [u.email, u.name]));
+
     // 5. Convert Supabase data into the format
     //    the existing My Projects card expects
     return (projects || []).map((project) => {
+        const mentorNamesForProject = [
+            ...new Set(
+                (mentorRows || [])
+                    .filter((m) => m.project_code === project.project_code)
+                    .map((m) => mentorNameByEmail.get(m.mentor_email) || m.mentor_email)
+                    .filter(Boolean)
+            )
+        ];
         const members = (allMembers || [])
             .filter(
                 (member) =>
@@ -234,7 +262,9 @@ async function loadStudentProjects() {
             semester: project.semester || "",
 
             domain: "",
-            mentor: "Faculty mentor",
+            mentor: mentorNamesForProject.length
+                ? mentorNamesForProject.join(", ")
+                : "Faculty mentor",
 
             team
         };
@@ -756,13 +786,14 @@ function renderHome() {
     document.getElementById("greetingText").textContent = `Hi, ${studentName} 👋`;
     document.getElementById("greetingSub").textContent = `Semester ${studentSemester} · ${cohortCodeFromSemester(studentSemester)} · ${userId}`;
 
-    const myProject = getMyProject();
+    // Active project comes from Supabase (project_members), same source as My Projects
+    const myProject = studentProjects.length > 0 ? studentProjects[0] : null;
     const pendingCount = interests.filter((i) => i.status === "Pending").length;
     const acceptedCount = interests.filter((i) => i.status === "Accepted").length;
 
     document.getElementById("statRow").innerHTML = `
         <div class="stat-card">
-            <p class="stat-value">${myProject ? "1" : "0"}</p>
+            <p class="stat-value">${studentProjects.length}</p>
             <p class="stat-label">Active project</p>
         </div>
         <div class="stat-card">
@@ -781,7 +812,7 @@ function renderHome() {
         myProjectPanel.innerHTML = `
             <div class="my-project-card">
                 <p class="my-project-title">${myProject.title}</p>
-                <p class="my-project-meta">${myProject.domain} · Mentor: ${myProject.mentor}</p>
+                <p class="my-project-meta">${[myProject.domain, "Mentor: " + myProject.mentor].filter(Boolean).join(" · ")}</p>
                 <div class="progress-track">
                     <div class="progress-fill" style="width:${myProject.progress}%"></div>
                 </div>
@@ -1392,8 +1423,124 @@ function slugify(text) {
         .slice(0, 40) || "idea";
 }
 
-const FLOAT_MENTORS = ["Dr. Ananya Rao", "Dr. Farhan Qureshi", "Dr. Priya Menon"];
-const FLOAT_DOMAINS = ["AI / Machine Learning", "Robotics & Embedded Systems", "Sustainability", "Healthcare Tech", "IoT", "Education"];
+/* ------------------------------------------------------
+   Mentors, domains and ideas now come from Supabase.
+   No placeholder data.
+------------------------------------------------------ */
+let floatMentors = [];   // [{ email, name }]
+let floatDomains = [];   // ["AI / ML", ...]
+let supabaseIdeas = [];  // ideas loaded from project_proposals
+
+// If your project_proposals column names differ, change them here.
+function buildProposalRow(f) {
+    return {
+        title: f.title,
+        description: `Problem: ${f.problem}\n\nScope: ${f.scope}`,
+        domain: f.domain,
+        tags: f.tags,
+        student_email: userId,
+        mentor_email: f.mentorEmail,
+        status: "pending"
+    };
+}
+
+async function loadFloatMentors() {
+    const { data: profiles, error } = await window.supabaseClient
+        .from("mentor_profiles")
+        .select("*");
+
+    if (error) {
+        console.error("Could not load mentors:", error);
+        floatMentors = [];
+        return;
+    }
+
+    const rows = (profiles || []).map((r) => ({
+        email: r.email || r.mentor_email || r.user_email || "",
+        fallbackName: r.name || r.full_name || ""
+    })).filter((r) => r.email);
+
+    let userRows = [];
+    if (rows.length > 0) {
+        const { data } = await window.supabaseClient
+            .from("users")
+            .select("email, name")
+            .in("email", rows.map((r) => r.email));
+        userRows = data || [];
+    }
+    const nameByEmail = new Map(userRows.map((u) => [u.email, u.name]));
+
+    floatMentors = rows.map((r) => ({
+        email: r.email,
+        name: nameByEmail.get(r.email) || r.fallbackName || r.email
+    })).sort((a, b) => a.name.localeCompare(b.name));
+
+    console.log("Mentors for Float an Idea:", floatMentors);
+}
+
+async function loadFloatDomains() {
+    const { data, error } = await window.supabaseClient
+        .from("project_domains")
+        .select("name")
+        .order("name");
+
+    if (error) {
+        console.error("Could not load domains:", error);
+        floatDomains = [];
+        return;
+    }
+    floatDomains = [...new Set((data || []).map((d) => d.name).filter(Boolean))];
+}
+
+function mapProposalRow(r, nameByEmail) {
+    const mentorEmail = r.mentor_email || r.target_mentor_email || "";
+    const studentEmail = r.student_email || r.proposed_by || r.created_by || "";
+    const status = String(r.status || "pending");
+    return {
+        id: r.proposal_id ?? r.id ?? `${studentEmail}-${r.created_at}`,
+        title: r.title || "Untitled idea",
+        studentUserId: studentEmail,
+        studentName: nameByEmail.get(studentEmail) || studentEmail || "A student",
+        domain: r.domain || r.domain_name || "General",
+        targetMentor: nameByEmail.get(mentorEmail) || mentorEmail || "a mentor",
+        proposedDate: String(r.created_at || r.proposed_at || r.submitted_at || "").slice(0, 10),
+        status: status.charAt(0).toUpperCase() + status.slice(1),
+        mentorFeedback: r.mentor_feedback || r.feedback || ""
+    };
+}
+
+async function loadStudentIdeas() {
+    const { data, error } = await window.supabaseClient
+        .from("project_proposals")
+        .select("*");
+
+    if (error) {
+        console.error("Could not load ideas:", error);
+        supabaseIdeas = [];
+        return;
+    }
+
+    const emails = [...new Set((data || []).flatMap((r) => [
+        r.student_email, r.proposed_by, r.created_by, r.mentor_email, r.target_mentor_email
+    ]).filter(Boolean))];
+
+    let userRows = [];
+    if (emails.length > 0) {
+        const { data: u } = await window.supabaseClient
+            .from("users").select("email, name").in("email", emails);
+        userRows = u || [];
+    }
+    const nameByEmail = new Map(userRows.map((u) => [u.email, u.name]));
+
+    supabaseIdeas = (data || []).map((r) => mapProposalRow(r, nameByEmail));
+    console.log("Ideas from Supabase:", supabaseIdeas);
+}
+
+// Ideas shown in this dashboard: Supabase + any that couldn't be saved yet (local fallback).
+function getStudentIdeas() {
+    const localOnly = (loadIdeaOverlay().added || []).filter((i) => i.studentUserId === userId);
+    return [...supabaseIdeas, ...localOnly];
+}
 
 function openFloatIdeaModal() {
     modalBody.innerHTML = `
@@ -1408,13 +1555,17 @@ function openFloatIdeaModal() {
 
             <label class="float-label">Domain
                 <select id="fiDomain">
-                    ${FLOAT_DOMAINS.map((d) => `<option value="${d}">${d}</option>`).join("")}
+                    ${floatDomains.length
+                        ? floatDomains.map((d) => `<option value="${d}">${d}</option>`).join("")
+                        : `<option value="General">General</option>`}
                 </select>
             </label>
 
             <label class="float-label">Send to mentor
-                <select id="fiMentor">
-                    ${FLOAT_MENTORS.map((m) => `<option value="${m}">${m}</option>`).join("")}
+                <select id="fiMentor" required>
+                    ${floatMentors.length
+                        ? floatMentors.map((m) => `<option value="${m.email}">${m.name}</option>`).join("")
+                        : `<option value="" disabled selected>No mentors available</option>`}
                 </select>
             </label>
 
@@ -1438,32 +1589,57 @@ function openFloatIdeaModal() {
 
     modalOverlay.classList.remove("hidden");
 
-    document.getElementById("floatIdeaForm").addEventListener("submit", (e) => {
+    document.getElementById("floatIdeaForm").addEventListener("submit", async (e) => {
         e.preventDefault();
         const title = document.getElementById("fiTitle").value.trim();
         if (!title) return;
 
-        const tags = document.getElementById("fiTags").value
-            .split(",").map((t) => t.trim()).filter(Boolean);
+        const mentorEmail = document.getElementById("fiMentor").value;
+        if (!mentorEmail) {
+            showToast("Please choose a mentor");
+            return;
+        }
+        const mentor = floatMentors.find((m) => m.email === mentorEmail);
 
-        addIdea({
-            id: `idea-${Date.now().toString(36)}`,
+        const fields = {
             title,
-            studentName,
-            studentSemester,
-            studentUserId: userId,
             domain: document.getElementById("fiDomain").value,
-            problemStatement: document.getElementById("fiProblem").value.trim(),
+            mentorEmail,
+            problem: document.getElementById("fiProblem").value.trim(),
             scope: document.getElementById("fiScope").value.trim(),
-            proposedDate: new Date().toISOString().slice(0, 10),
-            status: "Pending",
-            tags,
-            targetMentor: document.getElementById("fiMentor").value,
-            origin: "student"
-        });
+            tags: document.getElementById("fiTags").value
+                .split(",").map((t) => t.trim()).filter(Boolean)
+        };
+
+        const { error } = await window.supabaseClient
+            .from("project_proposals")
+            .insert(buildProposalRow(fields));
+
+        if (error) {
+            console.error("Could not save idea to Supabase:", error);
+            // fallback so the idea isn't lost
+            addIdea({
+                id: `idea-${Date.now().toString(36)}`,
+                title,
+                studentName,
+                studentSemester,
+                studentUserId: userId,
+                domain: fields.domain,
+                problemStatement: fields.problem,
+                scope: fields.scope,
+                proposedDate: new Date().toISOString().slice(0, 10),
+                status: "Pending",
+                tags: fields.tags,
+                targetMentor: mentor ? mentor.name : mentorEmail,
+                origin: "student"
+            });
+            showToast("Saved locally only — check console (Supabase error)");
+        } else {
+            await loadStudentIdeas();
+            showToast("Idea floated ✓ — your mentor will review it");
+        }
 
         closeModal();
-        showToast("Idea floated ✓ — your mentor will review it");
         renderMyIdeas();
         renderNotifBadge();
         goToTab("myideas");
@@ -1500,7 +1676,7 @@ function renderIdeasScopeChips() {
 }
 
 function renderMyIdeas() {
-    let ideas = getAllIdeas();
+    let ideas = getStudentIdeas();
     if (ideasScope === "Mine") {
         ideas = ideas.filter(isMyIdea);
     }
@@ -1559,7 +1735,7 @@ function buildNotifications() {
     });
 
     // Updates on my floated ideas.
-    getAllIdeas().filter(isMyIdea).filter((i) => i.status !== "Pending").forEach((i) => {
+    getStudentIdeas().filter(isMyIdea).filter((i) => i.status !== "Pending").forEach((i) => {
         notifications.push({
             icon: "💡",
             date: i.reviewedDate || i.proposedDate,
@@ -1648,6 +1824,12 @@ async function initStudentDashboard() {
     studentProjects = await loadStudentProjects();
 
     await loadDiscoverProjects();
+
+    await Promise.all([
+        loadFloatMentors(),
+        loadFloatDomains(),
+        loadStudentIdeas()
+    ]);
 
     renderDiscoverChips();
     renderAll();
