@@ -861,7 +861,7 @@ function getProposals() {
 /* ------------------------------------------------------
    REPORTS: there is no reports table in Supabase yet, so the
    hardcoded sample reports from data.js are NOT shown. Only
-   reports added through "+ Add Report" (kept in this browser)
+   reports added through "+ Add Report" (kept in this browser) ok
    appear here.
 ------------------------------------------------------ */
 function getAllReports() {
