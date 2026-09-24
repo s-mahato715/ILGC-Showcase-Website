@@ -1504,7 +1504,7 @@ function mapProposalRow(r, nameByEmail) {
         domain: r.domain || r.domain_name || "General",
         targetMentor: nameByEmail.get(mentorEmail) || mentorEmail || "a mentor",
         proposedDate: String(r.created_at || r.proposed_at || r.submitted_at || "").slice(0, 10),
-        status: status.charAt(0).toUpperCase() + status.slice(1),
+        status: status.split(/[_\s]+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" "),
         mentorFeedback: r.mentor_feedback || r.feedback || ""
     };
 }
