@@ -710,7 +710,13 @@ function renderInterest() {
 
     const allProjects = getAllProjects();
 
-    const bodyRows = rows.map((interest) => {
+    injectInterestCardStyles();
+    container.classList.add("interest-grid");
+
+    const escI = (v) => String(v == null ? "" : v)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+    container.innerHTML = rows.map((interest) => {
         const project = allProjects.find((p) => p.id === interest.projectId);
         const student = deriveStudentProfile(interest.studentUserId);
 
@@ -720,36 +726,90 @@ function renderInterest() {
             ? (allProjects.find((p) => p.id === acceptedElsewhere.projectId) || {}).title
             : "None";
 
-        const actions = interest.status === "Pending"
+        const initial = escI((student.name || "?").trim().charAt(0).toUpperCase());
+
+        const footer = interest.status === "Pending"
             ? `
                 <button class="btn btn-primary" data-interest-accept="${interest.studentUserId}|${interest.projectId}">Accept</button>
                 <button class="btn btn-danger" data-interest-reject="${interest.studentUserId}|${interest.projectId}">Reject</button>
             `
-            : `<span class="badge ${interestBadgeClass(interest.status)}">${interest.status}</span>`;
+            : "";
 
         return `
-            <div class="student-row">
-                <span class="student-name">${student.name}</span>
-                <span class="student-cell">Sem ${student.semester} · ${cohortCodeFromSemester(student.semester)}</span>
-                <span class="student-cell">${currentProject || "None"}</span>
-                <span class="student-project-of-interest">${project ? project.title : "—"}</span>
-                <span class="student-cell">${interest.status}</span>
-                <div class="student-actions">${actions}</div>
-            </div>
+            <article class="interest-card">
+                <div class="interest-card-top">
+                    <div class="interest-avatar">${initial}</div>
+                    <div class="interest-who">
+                        <h3 class="interest-name">${escI(student.name)}</h3>
+                        <p class="interest-sem">Sem ${escI(student.semester)} · ${escI(cohortCodeFromSemester(student.semester))}</p>
+                    </div>
+                    <span class="badge ${interestBadgeClass(interest.status)}">${escI(interest.status)}</span>
+                </div>
+                <div class="interest-card-body">
+                    <div class="interest-field">
+                        <span class="interest-label">Interested in</span>
+                        <span class="interest-value">${project ? escI(project.title) : "—"}</span>
+                    </div>
+                    <div class="interest-field">
+                        <span class="interest-label">Current project</span>
+                        <span class="interest-value">${escI(currentProject || "None")}</span>
+                    </div>
+                </div>
+                <div class="interest-card-actions">${footer}</div>
+            </article>
         `;
     }).join("");
+}
 
-    container.innerHTML = `
-        <div class="student-row head">
-            <span>Student</span>
-            <span>Semester</span>
-            <span>Current Project</span>
-            <span>Interested In</span>
-            <span>Status</span>
-            <span>Action</span>
-        </div>
-        ${bodyRows}
+function injectInterestCardStyles() {
+    if (document.getElementById("interestCardStyles")) return;
+    const st = document.createElement("style");
+    st.id = "interestCardStyles";
+    st.textContent = `
+        #interestTable.interest-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 28px;
+            background: none;
+            border: none;
+            box-shadow: none;
+            padding: 0;
+        }
+        .interest-card {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            padding: 22px;
+            background: var(--surface, #fff);
+            border: 1px solid var(--border, rgba(0,0,0,.12));
+            border-radius: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,.06);
+            transition: box-shadow .15s ease, transform .15s ease;
+        }
+        .interest-card:hover { box-shadow: 0 8px 22px rgba(0,0,0,.10); transform: translateY(-2px); }
+        .interest-card-top { display: flex; align-items: center; gap: 14px; }
+        .interest-avatar {
+            flex: none; width: 44px; height: 44px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 18px;
+            background: rgba(0,128,128,.12); color: #0f766e;
+        }
+        .interest-who { flex: 1; min-width: 0; }
+        .interest-name { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.25; }
+        .interest-sem { margin: 3px 0 0; font-size: 13px; opacity: .65; }
+        .interest-card-body { display: flex; flex-direction: column; gap: 12px; }
+        .interest-field { display: flex; flex-direction: column; gap: 3px; }
+        .interest-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .55; }
+        .interest-value { font-size: 14px; line-height: 1.4; }
+        .interest-card-actions {
+            display: flex; gap: 10px; margin-top: auto; padding-top: 16px;
+            border-top: 1px solid var(--border, rgba(0,0,0,.08));
+        }
+        .interest-card-actions .btn { flex: 1; }
+        .interest-card-actions:empty { display: none; }
     `;
+    document.head.appendChild(st);
 }
 
 function acceptInterest(studentUserId, projectId) {
@@ -861,7 +921,7 @@ function getProposals() {
 /* ------------------------------------------------------
    REPORTS: there is no reports table in Supabase yet, so the
    hardcoded sample reports from data.js are NOT shown. Only
-   reports added through "+ Add Report" (kept in this browser) ok
+   reports added through "+ Add Report" (kept in this browser)
    appear here.
 ------------------------------------------------------ */
 function getAllReports() {
@@ -1190,65 +1250,6 @@ function requestReportChanges(reportId) {
     });
 }
 
-function openAddReportModal() {
-    const projects = mentorGroups;
-
-    modalBody.innerHTML = `
-        <p class="modal-eyebrow">Add report</p>
-        <h2 class="modal-title">Log a new report</h2>
-        <form id="addReportForm">
-            <div class="modal-field">
-                <label for="rProject">Project / group</label>
-                <select id="rProject">
-                    ${projects.map((p) => `<option value="${p.id}">${p.title}</option>`).join("")}
-                </select>
-            </div>
-            <div class="modal-field">
-                <label for="rType">Report type</label>
-                <select id="rType">
-                    ${REPORT_TYPES.map((t) => `<option value="${t}">${t}</option>`).join("")}
-                </select>
-            </div>
-            <div class="modal-field">
-                <label for="rSubmittedBy">Submitted by</label>
-                <input type="text" id="rSubmittedBy" required placeholder="Student or group name">
-            </div>
-            <div class="modal-field">
-                <label for="rPreview">Report summary</label>
-                <textarea id="rPreview" required placeholder="Short summary of what's in this report…"></textarea>
-            </div>
-            <div class="modal-actions">
-                <button type="submit" class="btn btn-primary">Add Report</button>
-            </div>
-        </form>
-    `;
-
-    modalOverlay.classList.remove("hidden");
-
-    document.getElementById("addReportForm").addEventListener("submit", (e) => {
-        e.preventDefault();
-        const today = new Date().toISOString().slice(0, 10);
-
-        addReport({
-            id: `rpt-${Date.now().toString(36).slice(-6)}`,
-            projectId: document.getElementById("rProject").value,
-            reportType: document.getElementById("rType").value,
-            submittedBy: document.getElementById("rSubmittedBy").value.trim(),
-            submittedDate: today,
-            status: "Submitted",
-            preview: document.getElementById("rPreview").value.trim(),
-            comments: [],
-            history: [{ status: "Submitted", date: today, by: mentorName }]
-        });
-
-        showToast("Report added ✓");
-        closeModal();
-        renderReports();
-        renderHome();
-    });
-}
-
-
 /* ======================================================
    CREATE PROJECT (and populate it across students)
 ====================================================== */
@@ -1498,7 +1499,9 @@ document.getElementById("reportsStatusChips").addEventListener("click", (e) => {
     renderReports();
 });
 
-document.getElementById("addReportBtn").addEventListener("click", openAddReportModal);
+// "+ Add Report" removed from Group Reports
+const addReportBtnEl = document.getElementById("addReportBtn");
+if (addReportBtnEl) addReportBtnEl.remove();
 
 document.addEventListener("click", (e) => {
     const gotoBtn = e.target.closest("[data-goto]");
