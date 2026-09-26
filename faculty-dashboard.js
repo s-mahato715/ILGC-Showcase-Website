@@ -240,7 +240,11 @@ async function loadInterestedStudents() {
             (project) => project.project_code
         );
 
-    const { data: members, error } =
+    // --------------------------------------------------
+    // 1. Get students belonging to faculty's projects
+    // --------------------------------------------------
+
+    const { data: members, error: membersError } =
         await window.supabaseClient
             .from("project_members")
             .select(`
@@ -250,12 +254,15 @@ async function loadInterestedStudents() {
                 joined_at,
                 left_at
             `)
-            .in("project_code", projectCodes);
+            .in("project_code", projectCodes)
+            .is("left_at", null)
+            .order("project_code")
+            .order("student_email");
 
-    if (error) {
+    if (membersError) {
         console.error(
             "Could not load project members:",
-            error
+            membersError
         );
 
         return [];
@@ -265,6 +272,15 @@ async function loadInterestedStudents() {
         return [];
     }
 
+    console.log(
+        "Faculty project members:",
+        members
+    );
+
+    // --------------------------------------------------
+    // 2. Get student profile information
+    // --------------------------------------------------
+
     const studentEmails = [
         ...new Set(
             members
@@ -273,40 +289,112 @@ async function loadInterestedStudents() {
         )
     ];
 
-    const { data: students, error: studentError } =
+    const { data: profiles, error: profileError } =
         await window.supabaseClient
             .from("student_profiles")
-            .select("*")
+            .select(`
+                email,
+                roll_number,
+                program,
+                department,
+                semester,
+                admission_year,
+                graduation_year,
+                bio
+            `)
             .in("email", studentEmails);
 
-    if (studentError) {
+    if (profileError) {
         console.error(
             "Could not load student profiles:",
-            studentError
+            profileError
         );
 
         return [];
     }
 
-    studentProfilesData = students || [];
+    // --------------------------------------------------
+    // 3. Get student names from users table
+    // --------------------------------------------------
+
+    const { data: users, error: usersError } =
+        await window.supabaseClient
+            .from("users")
+            .select("email, name")
+            .in("email", studentEmails);
+
+    if (usersError) {
+        console.error(
+            "Could not load student names:",
+            usersError
+        );
+
+        return [];
+    }
+
+    console.log(
+        "Faculty student users:",
+        users
+    );
+
+    // --------------------------------------------------
+    // 4. Create lookup maps
+    // --------------------------------------------------
+
+    const profileMap = new Map(
+        (profiles || []).map(
+            (profile) => [
+                profile.email,
+                profile
+            ]
+        )
+    );
+
+    const userMap = new Map(
+        (users || []).map(
+            (user) => [
+                user.email,
+                user
+            ]
+        )
+    );
+
+    studentProfilesData = profiles || [];
+
+    // --------------------------------------------------
+    // 5. Combine member + profile + user data
+    // --------------------------------------------------
 
     return members.map((member) => {
 
-        const student =
-            studentProfilesData.find(
-                (profile) =>
-                    profile.email === member.student_email
-            );
+        const profile =
+            profileMap.get(
+                member.student_email
+            ) || {};
+
+        const user =
+            userMap.get(
+                member.student_email
+            ) || {};
 
         const project =
             myProjectsData.find(
                 (p) =>
-                    p.project_code === member.project_code
+                    p.project_code ===
+                    member.project_code
             );
 
         return {
             ...member,
-            student,
+
+            student: {
+                ...profile,
+                email: member.student_email,
+                name:
+                    user.name ||
+                    member.student_email
+            },
+
             project
         };
 
@@ -821,6 +909,53 @@ function projectCardHtml(project) {
                 project.id
         );
 
+    const studentsHtml =
+        members.length
+            ? members.map((member) => {
+
+                const student =
+                    member.student || {};
+
+                const name =
+                    student.name ||
+                    student.email ||
+                    "Unknown student";
+
+                const initial =
+                    name
+                        .charAt(0)
+                        .toUpperCase();
+
+                return `
+                    <div class="faculty-student-row">
+
+                        <div class="faculty-student-avatar">
+                            ${initial}
+                        </div>
+
+                        <div class="faculty-student-info">
+
+                            <strong>
+                                ${name}
+                            </strong>
+
+                            <span>
+                                ${student.email || ""}
+                            </span>
+
+                        </div>
+
+                    </div>
+                `;
+
+            }).join("")
+
+            : `
+                <p class="faculty-no-students">
+                    No students assigned to this project yet.
+                </p>
+            `;
+
     return `
         <article class="project-card">
 
@@ -846,10 +981,12 @@ function projectCardHtml(project) {
                 </h3>
 
                 <div class="progress-track">
+
                     <div
                         class="progress-fill"
                         style="width:${project.progress}%"
                     ></div>
+
                 </div>
 
                 <p
@@ -865,6 +1002,7 @@ function projectCardHtml(project) {
                         <strong>
                             ${members.length}
                         </strong>
+
                         student${members.length !== 1 ? "s" : ""}
                     </span>
 
@@ -872,8 +1010,23 @@ function projectCardHtml(project) {
                         <strong>
                             ${project.semester || "—"}
                         </strong>
+
                         semester
                     </span>
+
+                </div>
+
+                <div class="faculty-students-section">
+
+                    <div class="faculty-students-heading">
+                        STUDENTS (${members.length})
+                    </div>
+
+                    <div class="faculty-student-list">
+
+                        ${studentsHtml}
+
+                    </div>
 
                 </div>
 
