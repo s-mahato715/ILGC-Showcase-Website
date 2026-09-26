@@ -39,6 +39,7 @@ if (!window.supabaseClient) {
 let myProjectsData = [];
 let allProjectsData = [];
 let interestedStudentsData = [];
+let myProjectMembersData = [];
 let studentProfilesData = [];
 
 let projectsActiveStatus = "All";
@@ -229,6 +230,89 @@ async function loadMyProjects() {
    LOAD PROJECT MEMBERS
 ====================================================== */
 
+async function loadProjectTeamMembers() {
+
+    if (!myProjectsData.length) {
+        return [];
+    }
+
+    const projectCodes =
+        myProjectsData.map(
+            (project) => project.project_code
+        );
+
+    const { data: members, error } =
+        await window.supabaseClient
+            .from("project_members")
+            .select(`
+                project_code,
+                student_email,
+                member_role,
+                joined_at,
+                left_at
+            `)
+            .in("project_code", projectCodes)
+            .is("left_at", null);
+
+    if (error) {
+        console.error(
+            "Could not load project members:",
+            error
+        );
+
+        return [];
+    }
+
+    if (!members || members.length === 0) {
+        return [];
+    }
+
+    const studentEmails = [
+        ...new Set(
+            members
+                .map((member) => member.student_email)
+                .filter(Boolean)
+        )
+    ];
+
+    const { data: students, error: studentError } =
+        await window.supabaseClient
+            .from("student_profiles")
+            .select("*")
+            .in("email", studentEmails);
+
+    if (studentError) {
+        console.error(
+            "Could not load student profiles:",
+            studentError
+        );
+
+        return [];
+    }
+
+    return members.map((member) => {
+
+        const student =
+            (students || []).find(
+                (profile) =>
+                    profile.email === member.student_email
+            );
+
+        const project =
+            myProjectsData.find(
+                (p) =>
+                    p.project_code === member.project_code
+            );
+
+        return {
+            ...member,
+            student,
+            project
+        };
+
+    });
+}
+
 async function loadInterestedStudents() {
 
     if (!myProjectsData.length) {
@@ -240,82 +324,56 @@ async function loadInterestedStudents() {
             (project) => project.project_code
         );
 
-    // --------------------------------------------------
-    // 1. Get students belonging to faculty's projects
-    // --------------------------------------------------
-
-    const { data: members, error: membersError } =
+    // Pending expressions of interest for MY projects only —
+    // this is students asking to join, not the current team.
+    const { data: interests, error } =
         await window.supabaseClient
-            .from("project_members")
+            .from("expressions_of_interest")
             .select(`
+                id,
                 project_code,
                 student_email,
-                member_role,
-                joined_at,
-                left_at
+                status,
+                created_at
             `)
             .in("project_code", projectCodes)
-            .is("left_at", null)
-            .order("project_code")
-            .order("student_email");
+            .eq("status", "Pending");
 
-    if (membersError) {
+    if (error) {
         console.error(
-            "Could not load project members:",
-            membersError
+            "Could not load expressions of interest:",
+            error
         );
 
         return [];
     }
 
-    if (!members || members.length === 0) {
+    if (!interests || interests.length === 0) {
         return [];
     }
 
-    console.log(
-        "Faculty project members:",
-        members
-    );
-
-    // --------------------------------------------------
-    // 2. Get student profile information
-    // --------------------------------------------------
-
     const studentEmails = [
         ...new Set(
-            members
-                .map((member) => member.student_email)
+            interests
+                .map((interest) => interest.student_email)
                 .filter(Boolean)
         )
     ];
 
-    const { data: profiles, error: profileError } =
+    const { data: students, error: studentError } =
         await window.supabaseClient
             .from("student_profiles")
-            .select(`
-                email,
-                roll_number,
-                program,
-                department,
-                semester,
-                admission_year,
-                graduation_year,
-                bio
-            `)
+            .select("*")
             .in("email", studentEmails);
 
-    if (profileError) {
+    if (studentError) {
         console.error(
             "Could not load student profiles:",
-            profileError
+            studentError
         );
 
         return [];
     }
-
-    // --------------------------------------------------
-    // 3. Get student names from users table
-    // --------------------------------------------------
 
     const { data: users, error: usersError } =
         await window.supabaseClient
@@ -328,73 +386,38 @@ async function loadInterestedStudents() {
             "Could not load student names:",
             usersError
         );
-
-        return [];
     }
 
-    console.log(
-        "Faculty student users:",
-        users
+    const nameMap = new Map(
+        (users || []).map((u) => [u.email, u.name])
     );
 
-    // --------------------------------------------------
-    // 4. Create lookup maps
-    // --------------------------------------------------
+    studentProfilesData = students || [];
 
-    const profileMap = new Map(
-        (profiles || []).map(
-            (profile) => [
-                profile.email,
-                profile
-            ]
-        )
-    );
+    return interests.map((interest) => {
 
-    const userMap = new Map(
-        (users || []).map(
-            (user) => [
-                user.email,
-                user
-            ]
-        )
-    );
+        const student =
+            studentProfilesData.find(
+                (profile) =>
+                    profile.email === interest.student_email
+            );
 
-    studentProfilesData = profiles || [];
-
-    // --------------------------------------------------
-    // 5. Combine member + profile + user data
-    // --------------------------------------------------
-
-    return members.map((member) => {
-
-        const profile =
-            profileMap.get(
-                member.student_email
-            ) || {};
-
-        const user =
-            userMap.get(
-                member.student_email
-            ) || {};
+        const studentWithName = student
+            ? { ...student, name: nameMap.get(student.email) }
+            : null;
 
         const project =
             myProjectsData.find(
                 (p) =>
-                    p.project_code ===
-                    member.project_code
+                    p.project_code === interest.project_code
             );
 
         return {
-            ...member,
-
-            student: {
-                ...profile,
-                email: member.student_email,
-                name:
-                    user.name ||
-                    member.student_email
-            },
-
+            id: interest.id,
+            project_code: interest.project_code,
+            student_email: interest.student_email,
+            created_at: interest.created_at,
+            student: studentWithName,
             project
         };
 
@@ -903,58 +926,11 @@ document
 function projectCardHtml(project) {
 
     const members =
-        interestedStudentsData.filter(
+        myProjectMembersData.filter(
             (member) =>
                 member.project_code ===
                 project.id
         );
-
-    const studentsHtml =
-        members.length
-            ? members.map((member) => {
-
-                const student =
-                    member.student || {};
-
-                const name =
-                    student.name ||
-                    student.email ||
-                    "Unknown student";
-
-                const initial =
-                    name
-                        .charAt(0)
-                        .toUpperCase();
-
-                return `
-                    <div class="faculty-student-row">
-
-                        <div class="faculty-student-avatar">
-                            ${initial}
-                        </div>
-
-                        <div class="faculty-student-info">
-
-                            <strong>
-                                ${name}
-                            </strong>
-
-                            <span>
-                                ${student.email || ""}
-                            </span>
-
-                        </div>
-
-                    </div>
-                `;
-
-            }).join("")
-
-            : `
-                <p class="faculty-no-students">
-                    No students assigned to this project yet.
-                </p>
-            `;
 
     return `
         <article class="project-card">
@@ -981,12 +957,10 @@ function projectCardHtml(project) {
                 </h3>
 
                 <div class="progress-track">
-
                     <div
                         class="progress-fill"
                         style="width:${project.progress}%"
                     ></div>
-
                 </div>
 
                 <p
@@ -1002,7 +976,6 @@ function projectCardHtml(project) {
                         <strong>
                             ${members.length}
                         </strong>
-
                         student${members.length !== 1 ? "s" : ""}
                     </span>
 
@@ -1010,23 +983,8 @@ function projectCardHtml(project) {
                         <strong>
                             ${project.semester || "—"}
                         </strong>
-
                         semester
                     </span>
-
-                </div>
-
-                <div class="faculty-students-section">
-
-                    <div class="faculty-students-heading">
-                        STUDENTS (${members.length})
-                    </div>
-
-                    <div class="faculty-student-list">
-
-                        ${studentsHtml}
-
-                    </div>
 
                 </div>
 
@@ -1072,7 +1030,7 @@ function renderHome() {
         ).length;
 
     const studentCount =
-        interestedStudentsData.length;
+        myProjectMembersData.length;
 
     document.getElementById(
         "statRow"
@@ -1117,7 +1075,7 @@ function renderHome() {
         <div class="stat-card">
             <p class="stat-value">
                 ${new Set(
-                    interestedStudentsData.map(
+                    myProjectMembersData.map(
                         (student) =>
                             student.student_email
                     )
@@ -1362,6 +1320,12 @@ function renderStudents() {
             "studentsEmpty"
         );
 
+    // Interested Students tab is disabled for now - these elements
+    // no longer exist in the HTML, so bail out safely.
+    if (!container || !empty) {
+        return;
+    }
+
     if (!interestedStudentsData.length) {
 
         container.innerHTML = "";
@@ -1379,13 +1343,13 @@ function renderStudents() {
 
     const rows =
         interestedStudentsData
-            .map((member) => {
+            .map((interest) => {
 
                 const student =
-                    member.student;
+                    interest.student;
 
                 const project =
-                    member.project;
+                    interest.project;
 
                 return `
                     <div class="student-row">
@@ -1402,20 +1366,24 @@ function renderStudents() {
                             ${project?.title || "—"}
                         </span>
 
-                        <span class="student-project-of-interest">
-                            ${project?.title || "—"}
-                        </span>
-
-                        <span class="student-cell">
-                            ${member.member_role || "Member"}
-                        </span>
-
                         <div class="student-actions">
                             <button
                                 class="btn btn-secondary"
-                                data-student-email="${member.student_email}"
+                                data-student-email="${interest.student_email}"
                             >
                                 View
+                            </button>
+                            <button
+                                class="btn btn-primary"
+                                data-accept-interest="${interest.id}"
+                            >
+                                Accept
+                            </button>
+                            <button
+                                class="btn btn-danger"
+                                data-reject-interest="${interest.id}"
+                            >
+                                Reject
                             </button>
                         </div>
 
@@ -1431,14 +1399,67 @@ function renderStudents() {
             <span>Student</span>
             <span>Semester</span>
             <span>Project</span>
-            <span>Project</span>
-            <span>Role</span>
             <span>Action</span>
 
         </div>
 
         ${rows}
     `;
+}
+
+/* Accept: add the student to project_members, mark the interest
+   Accepted (so it drops off this "Pending" list for good). */
+async function acceptInterest(interestId) {
+
+    const interest = interestedStudentsData.find((i) => i.id === interestId);
+    if (!interest) return;
+
+    const { error: memberError } =
+        await window.supabaseClient
+            .from("project_members")
+            .insert({
+                project_code: interest.project_code,
+                student_email: interest.student_email
+            });
+
+    if (memberError) {
+        console.error("Could not add student to project_members:", memberError);
+        alert("Couldn't add this student to the project. See console for details.");
+        return;
+    }
+
+    const { error: statusError } =
+        await window.supabaseClient
+            .from("expressions_of_interest")
+            .update({ status: "Accepted" })
+            .eq("id", interestId);
+
+    if (statusError) {
+        console.error("Could not update interest status:", statusError);
+    }
+
+    interestedStudentsData = await loadInterestedStudents();
+    renderStudents();
+}
+
+/* Reject: just mark the interest Rejected — it drops off this list,
+   student stays free to express interest elsewhere. */
+async function rejectInterest(interestId) {
+
+    const { error } =
+        await window.supabaseClient
+            .from("expressions_of_interest")
+            .update({ status: "Rejected" })
+            .eq("id", interestId);
+
+    if (error) {
+        console.error("Could not reject interest:", error);
+        alert("Couldn't reject this request. See console for details.");
+        return;
+    }
+
+    interestedStudentsData = interestedStudentsData.filter((i) => i.id !== interestId);
+    renderStudents();
 }
 
 
@@ -1662,7 +1683,7 @@ function renderDiscoverChips() {
 function discoverCardHtml(project) {
 
     const members =
-        interestedStudentsData.filter(
+        myProjectMembersData.filter(
             (member) =>
                 member.project_code ===
                 project.id
@@ -1872,7 +1893,7 @@ function openDetailModal(projectId) {
     }
 
     const members =
-        interestedStudentsData.filter(
+        myProjectMembersData.filter(
             (member) =>
                 member.project_code ===
                 projectId
@@ -2307,6 +2328,34 @@ document.addEventListener(
 
             return;
         }
+
+        const acceptButton =
+            event.target.closest(
+                "[data-accept-interest]"
+            );
+
+        if (acceptButton) {
+
+            acceptInterest(
+                acceptButton.dataset.acceptInterest
+            );
+
+            return;
+        }
+
+        const rejectButton =
+            event.target.closest(
+                "[data-reject-interest]"
+            );
+
+        if (rejectButton) {
+
+            rejectInterest(
+                rejectButton.dataset.rejectInterest
+            );
+
+            return;
+        }
     }
 );
 
@@ -2566,16 +2615,18 @@ async function initializeFacultyDashboard() {
 
 
     /* ----------------------------------------------
-       Load students
+       Load students (team roster - used for project card
+       and Home page student counts). Interested Students tab
+       is disabled for now, so we don't load pending interests.
     ---------------------------------------------- */
 
-    interestedStudentsData =
-        await loadInterestedStudents();
+    myProjectMembersData =
+        await loadProjectTeamMembers();
 
 
     console.log(
         "Students in my projects:",
-        interestedStudentsData
+        myProjectMembersData
     );
 
 
@@ -2591,7 +2642,6 @@ async function initializeFacultyDashboard() {
     renderHome();
     renderMyProjects();
     renderDiscover();
-    renderStudents();
 
     renderIdeas();
     renderReports();
