@@ -767,3 +767,88 @@
     white-space: nowrap;
     flex-shrink: 0;
 }
+
+/* ======================================================
+   FACULTY PROJECT STUDENT LIST
+====================================================== */
+
+.faculty-students-section {
+    margin-top: 22px;
+}
+
+.faculty-students-heading {
+    margin-bottom: 12px;
+
+    color: #087f7d;
+
+    font-size: 12px;
+    font-weight: 800;
+
+    letter-spacing: 0.06em;
+}
+
+.faculty-student-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.faculty-student-row {
+    display: flex;
+    align-items: center;
+
+    gap: 10px;
+
+    padding: 8px 0;
+}
+
+.faculty-student-avatar {
+    width: 34px;
+    height: 34px;
+
+    flex: 0 0 34px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    background: #eef0ff;
+    color: #4d4ca3;
+
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.faculty-student-info {
+    min-width: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 2px;
+}
+
+.faculty-student-info strong {
+    color: #193b43;
+
+    font-size: 14px;
+}
+
+.faculty-student-info span {
+    color: #6b8087;
+
+    font-size: 12px;
+
+    overflow-wrap: anywhere;
+}
+
+.faculty-no-students {
+    margin: 0;
+
+    color: #6b8087;
+
+    font-size: 13px;
+    font-style: italic;
+}
