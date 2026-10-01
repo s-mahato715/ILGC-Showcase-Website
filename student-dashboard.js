@@ -407,14 +407,37 @@ projects.forEach((project) => {
         projectDomainMap.get(project.project_code) || [];
 });
 
+// Load EVERY domain from project_domains (the Project Tags table),
+// so tags created by faculty show up here even before any project uses them.
+let allDomainNames = [];
+
+const { data: allDomainData, error: allDomainError } =
+    await window.supabaseClient
+        .from("project_domains")
+        .select("name")
+        .order("name");
+
+if (allDomainError) {
+    console.error(
+        "Could not load all domains:",
+        allDomainError
+    );
+} else {
+    allDomainNames =
+        (allDomainData || [])
+            .map((domain) => domain.name)
+            .filter(Boolean);
+}
+
 // Create Domain filter options
 DOMAINS = [
     "All",
-    ...new Set(
-        projects.flatMap(
+    ...new Set([
+        ...allDomainNames,
+        ...projects.flatMap(
             (project) => project.domains
         )
-    )
+    ])
 ];
 
 console.log(
@@ -1048,8 +1071,15 @@ function renderDiscoverChips() {
         <button class="chip" data-status="${status}" data-active="${status === activeStatus}">${status}</button>
     `).join("");
 
+    const escapeChip = (text) =>
+        String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+
     document.getElementById("domainChips").innerHTML = DOMAINS.map((domain) => `
-        <button class="chip" data-domain-filter="${domain}" data-active="${domain === activeDomain}">${domain}</button>
+        <button class="chip" data-domain-filter="${escapeChip(domain)}" data-active="${domain === activeDomain}">${escapeChip(domain)}</button>
     `).join("");
 
     const mentorSelect = document.getElementById("discoverMentorSelect");
