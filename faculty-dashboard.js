@@ -40,6 +40,7 @@ let myProjectsData = [];
 let allProjectsData = [];
 let interestedStudentsData = [];
 let myProjectMembersData = [];
+let allProjectMembersData = [];
 let studentProfilesData = [];
 let allDomainNames = [];
 
@@ -314,15 +315,15 @@ async function loadProjectTeamMembers() {
     });
 }
 
-async function loadProjectTeamMembers() {
+async function loadProjectTeamMembers(projects = myProjectsData) {
 
-    if (!myProjectsData.length) {
-        console.log("No projects assigned to faculty.");
+    if (!projects.length) {
+        console.log("No projects to load members for.");
         return [];
     }
 
     const projectCodes =
-        myProjectsData.map(
+        projects.map(
             (project) => project.project_code
         );
 
@@ -472,7 +473,7 @@ async function loadProjectTeamMembers() {
             ) || {};
 
         const project =
-            myProjectsData.find(
+            projects.find(
                 (project) =>
                     project.project_code ===
                     member.project_code
@@ -1867,7 +1868,7 @@ function renderDiscoverChips() {
 function discoverCardHtml(project) {
 
     const members =
-        myProjectMembersData.filter(
+        allProjectMembersData.filter(
             (member) =>
                 member.project_code ===
                 project.id
@@ -2077,7 +2078,7 @@ function openDetailModal(projectId) {
     }
 
     const members =
-        myProjectMembersData.filter(
+        allProjectMembersData.filter(
             (member) =>
                 member.project_code ===
                 projectId
@@ -3039,7 +3040,10 @@ async function initializeFacultyDashboard() {
     ---------------------------------------------- */
 
     myProjectMembersData =
-        await loadProjectTeamMembers();
+        await loadProjectTeamMembers(myProjectsData);
+
+    allProjectMembersData =
+        await loadProjectTeamMembers(allProjectsData);
 
 
     console.log(
