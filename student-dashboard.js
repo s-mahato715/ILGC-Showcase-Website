@@ -5,7 +5,6 @@
 const role = localStorage.getItem("selectedRole");
 const loggedIn = localStorage.getItem("loggedIn");
 const userId = localStorage.getItem("userId");
-
 /* ======================================================
    SUPABASE
 ====================================================== */
@@ -32,52 +31,35 @@ let studentDepartment = "";
 let studentRollNumber = "";
 let studentProjects = [];
 let discoverProjects = [];
-let studentInterests = [];
-let mentorData = [];
-let domainData = [];
-let ideaData = [];
-let currentProject = null;
-
-
-/* ======================================================
-   STUDENT PROFILE
-====================================================== */
-
 async function loadStudentProfile() {
-    if (!window.supabaseClient || !userId) return;
+    console.log("Loading student profile for:", userId);
 
     const { data: user, error: userError } =
         await window.supabaseClient
             .from("users")
-            .select("email, name")
+            .select("email, name, role")
             .eq("email", userId)
             .maybeSingle();
 
     if (userError) {
         console.error("Could not load student user:", userError);
+        return;
     }
 
-    if (user) {
-        studentName = user.name || "Student";
+    console.log("Student user from Supabase:", user);
+
+    if (user?.name) {
+        studentName = user.name;
     }
 
     const { data: profile, error: profileError } =
         await window.supabaseClient
             .from("student_profiles")
             .select(`
-                email,
                 roll_number,
                 program,
                 department,
-                semester,
-                admission_year,
-                graduation_year,
-                bio,
-                skills,
-                interests,
-                github_url,
-                linkedin_url,
-                portfolio_url
+                semester
             `)
             .eq("email", userId)
             .maybeSingle();
@@ -90,111 +72,20 @@ async function loadStudentProfile() {
         return;
     }
 
+    console.log("Student profile from Supabase:", profile);
+
     if (profile) {
-        studentSemester = profile.semester || "";
+        studentRollNumber = profile.roll_number || "";
         studentProgram = profile.program || "";
         studentDepartment = profile.department || "";
-        studentRollNumber = profile.roll_number || "";
+        studentSemester = profile.semester || "";
     }
-
-    updateStudentProfileUI();
 }
-
-
-/* ======================================================
-   UPDATE STUDENT PROFILE UI
-====================================================== */
-
-function updateStudentProfileUI() {
-    const nameElements = document.querySelectorAll(
-        "[data-student-name]"
-    );
-
-    nameElements.forEach((element) => {
-        element.textContent = studentName;
-    });
-
-    const semesterElements = document.querySelectorAll(
-        "[data-student-semester]"
-    );
-
-    semesterElements.forEach((element) => {
-        element.textContent = studentSemester;
-    });
-
-    const programElements = document.querySelectorAll(
-        "[data-student-program]"
-    );
-
-    programElements.forEach((element) => {
-        element.textContent = studentProgram;
-    });
-
-    const departmentElements = document.querySelectorAll(
-        "[data-student-department]"
-    );
-
-    departmentElements.forEach((element) => {
-        element.textContent = studentDepartment;
-    });
-
-    const rollElements = document.querySelectorAll(
-        "[data-student-roll]"
-    );
-
-    rollElements.forEach((element) => {
-        element.textContent = studentRollNumber;
-    });
-}
-
-
-/* ======================================================
-   EXPRESSIONS OF INTEREST
-====================================================== */
-
-async function loadStudentInterests() {
-    studentInterests = [];
-
-    if (!window.supabaseClient || !userId) {
-        return;
-    }
-
-    const { data, error } =
-        await window.supabaseClient
-            .from("expressions_of_interest")
-            .select(`
-                student_email,
-                project_code,
-                status,
-                message,
-                submitted_at,
-                reviewed_by,
-                reviewed_at,
-                review_comment
-            `)
-            .eq("student_email", userId);
-
-    if (error) {
-        console.error(
-            "Could not load student expressions of interest:",
-            error
-        );
-        return;
-    }
-
-    studentInterests = data || [];
-}
-
-
-/* ======================================================
-   LOAD STUDENT PROJECTS
-====================================================== */
 
 async function loadStudentProjects() {
-    if (!window.supabaseClient || !userId) {
-        return [];
-    }
+    console.log("Loading projects for student:", userId);
 
+    // 1. Get this student's active project memberships
     const { data: memberships, error: membershipError } =
         await window.supabaseClient
             .from("project_members")
@@ -216,14 +107,17 @@ async function loadStudentProjects() {
         return [];
     }
 
-    const projectCodes = (memberships || [])
-        .map((item) => item.project_code)
-        .filter(Boolean);
+    console.log("Student project memberships:", memberships);
 
-    if (projectCodes.length === 0) {
+    if (!memberships || memberships.length === 0) {
         return [];
     }
 
+    const projectCodes = [
+        ...new Set(memberships.map((m) => m.project_code))
+    ];
+
+    // 2. Get project details
     const { data: projects, error: projectsError } =
         await window.supabaseClient
             .from("projects")
@@ -233,14 +127,9 @@ async function loadStudentProjects() {
                 description,
                 summary,
                 expected_outcome,
-                domain_id,
                 status,
                 progress,
                 academic_year,
-                image_url,
-                created_by,
-                created_at,
-                updated_at,
                 semester
             `)
             .in("project_code", projectCodes);
@@ -253,33 +142,143 @@ async function loadStudentProjects() {
         return [];
     }
 
-    return (projects || []).map((project) => {
-        const membership = memberships.find(
-            (item) =>
-                item.project_code === project.project_code
+    console.log("Student projects from Supabase:", projects);
+
+    // 3. Get all students in these projects
+    const { data: allMembers, error: membersError } =
+        await window.supabaseClient
+            .from("project_members")
+            .select(`
+                project_code,
+                student_email,
+                member_role,
+                joined_at
+            `)
+            .in("project_code", projectCodes)
+            .is("left_at", null);
+
+    if (membersError) {
+        console.error(
+            "Could not load project teammates:",
+            membersError
         );
+        return [];
+    }
+
+    // 4. Get teammate names
+    const studentEmails = [
+        ...new Set(
+            (allMembers || []).map((member) => member.student_email)
+        )
+    ];
+
+    const { data: students, error: studentsError } =
+        await window.supabaseClient
+            .from("users")
+            .select("email, name")
+            .in("email", studentEmails);
+
+    if (studentsError) {
+        console.error(
+            "Could not load teammate names:",
+            studentsError
+        );
+    }
+
+    const studentMap = new Map(
+        (students || []).map((student) => [
+            student.email,
+            student
+        ])
+    );
+
+    // 4b. Get mentor names for these projects
+    const { data: mentorRows } =
+        await window.supabaseClient
+            .from("project_mentors")
+            .select("project_code, mentor_email")
+            .in("project_code", projectCodes);
+
+    const mentorEmailList = [
+        ...new Set((mentorRows || []).map((m) => m.mentor_email).filter(Boolean))
+    ];
+    let mentorUserRows = [];
+    if (mentorEmailList.length > 0) {
+        const { data } = await window.supabaseClient
+            .from("users")
+            .select("email, name")
+            .in("email", mentorEmailList);
+        mentorUserRows = data || [];
+    }
+    const mentorNameByEmail = new Map(mentorUserRows.map((u) => [u.email, u.name]));
+
+    // 5. Convert Supabase data into the format
+    //    the existing My Projects card expects
+    return (projects || []).map((project) => {
+        const mentorNamesForProject = [
+            ...new Set(
+                (mentorRows || [])
+                    .filter((m) => m.project_code === project.project_code)
+                    .map((m) => mentorNameByEmail.get(m.mentor_email) || m.mentor_email)
+                    .filter(Boolean)
+            )
+        ];
+        const members = (allMembers || [])
+            .filter(
+                (member) =>
+                    member.project_code === project.project_code
+            );
+
+        const team = members.map((member) => ({
+            name:
+                studentMap.get(member.student_email)?.name ||
+                member.student_email,
+            email: member.student_email,
+            role: member.member_role
+        }));
 
         return {
-            ...project,
+            id: project.project_code,
             projectCode: project.project_code,
-            projectId: project.project_code,
-            memberRole: membership?.member_role || "student",
-            joinedAt: membership?.joined_at || null
+
+            title: project.title,
+            summary:
+                project.description ||
+                project.summary ||
+                "",
+
+            expectedOutcome:
+                project.expected_outcome || "",
+
+            status:
+                project.status
+                    ? project.status.charAt(0).toUpperCase() +
+                      project.status.slice(1)
+                    : "Proposed",
+
+            progress: project.progress ?? 0,
+
+            cohort: project.academic_year || "",
+            semester: project.semester || "",
+
+            domain: "",
+            mentor: mentorNamesForProject.length
+                ? mentorNamesForProject.join(", ")
+                : "Faculty mentor",
+
+            team
         };
     });
 }
 
-
-/* ======================================================
-   DISCOVER PROJECTS
-====================================================== */
-
 async function loadDiscoverProjects() {
-    if (!window.supabaseClient) {
-        return [];
-    }
+    console.log("Loading Discover Projects from Supabase...");
 
-    const { data, error } =
+    // --------------------------------------------------
+    // 1. LOAD PROJECTS
+    // --------------------------------------------------
+
+    const { data: projects, error: projectsError } =
         await window.supabaseClient
             .from("projects")
             .select(`
@@ -288,489 +287,388 @@ async function loadDiscoverProjects() {
                 description,
                 summary,
                 expected_outcome,
-                domain_id,
                 status,
                 progress,
                 academic_year,
-                image_url,
-                created_by,
-                created_at,
-                updated_at,
                 semester
             `)
-            .order("created_at", {
+            .order("project_code");
+
+    if (projectsError) {
+        console.error(
+            "Could not load Discover Projects:",
+            projectsError
+        );
+
+        discoverProjects = [];
+        return;
+    }
+
+    console.log("Projects from Supabase:", projects);
+
+    if (!projects || projects.length === 0) {
+        discoverProjects = [];
+        return;
+    }
+
+    const projectCodes = projects.map(
+        (project) => project.project_code
+    );
+
+    // --------------------------------------------------
+// 2. LOAD DOMAINS
+//    projects → project_domain_map → project_domains
+// --------------------------------------------------
+
+let domainMappings = [];
+let domains = [];
+
+// Get project ↔ domain relationships
+const { data: mappingData, error: mappingError } =
+    await window.supabaseClient
+        .from("project_domain_map")
+        .select("project_code, domain_id")
+        .in("project_code", projectCodes);
+
+if (mappingError) {
+    console.error(
+        "Could not load project-domain mappings:",
+        mappingError
+    );
+} else {
+    domainMappings = mappingData || [];
+}
+
+console.log(
+    "Project-domain mappings from Supabase:",
+    domainMappings
+);
+
+// Get the unique domain IDs
+const domainIds = [
+    ...new Set(
+        domainMappings
+            .map((mapping) => mapping.domain_id)
+            .filter(Boolean)
+    )
+];
+
+// Get domain names
+if (domainIds.length > 0) {
+    const { data: domainData, error: domainError } =
+        await window.supabaseClient
+            .from("project_domains")
+            .select("domain_id, name")
+            .in("domain_id", domainIds);
+
+    if (domainError) {
+        console.error(
+            "Could not load project domains:",
+            domainError
+        );
+    } else {
+        domains = domainData || [];
+    }
+}
+
+console.log(
+    "Project domains from Supabase:",
+    domains
+);
+
+// domain_id → domain name
+const domainMap = new Map(
+    domains.map((domain) => [
+        domain.domain_id,
+        domain.name
+    ])
+);
+
+// project_code → array of domain names
+const projectDomainMap = new Map();
+
+domainMappings.forEach((mapping) => {
+    const domainName = domainMap.get(mapping.domain_id);
+
+    if (!domainName) return;
+
+    if (!projectDomainMap.has(mapping.project_code)) {
+        projectDomainMap.set(mapping.project_code, []);
+    }
+
+    projectDomainMap
+        .get(mapping.project_code)
+        .push(domainName);
+});
+
+// Add the domain array to each project
+projects.forEach((project) => {
+    project.domains =
+        projectDomainMap.get(project.project_code) || [];
+});
+
+// Create Domain filter options
+DOMAINS = [
+    "All",
+    ...new Set(
+        projects.flatMap(
+            (project) => project.domains
+        )
+    )
+];
+
+console.log(
+    "Final Domain filters:",
+    DOMAINS
+);
+
+    // --------------------------------------------------
+    // 3. LOAD PROJECT MENTORS
+    // --------------------------------------------------
+
+    const { data: mentorAssignments, error: mentorError } =
+        await window.supabaseClient
+            .from("project_mentors")
+            .select(`
+                project_code,
+                mentor_email,
+                mentor_role
+            `)
+            .in("project_code", projectCodes);
+
+    if (mentorError) {
+        console.error(
+            "Could not load project mentors:",
+            mentorError
+        );
+    }
+
+    console.log(
+        "Project mentor assignments:",
+        mentorAssignments
+    );
+
+    const mentorEmails = [
+        ...new Set(
+            (mentorAssignments || [])
+                .map((mentor) => mentor.mentor_email)
+                .filter(Boolean)
+        )
+    ];
+
+    // --------------------------------------------------
+    // 4. LOAD MENTOR NAMES
+    // --------------------------------------------------
+
+    let mentors = [];
+
+    if (mentorEmails.length > 0) {
+        const { data: mentorUsers, error: mentorUsersError } =
+            await window.supabaseClient
+                .from("users")
+                .select("email, name")
+                .in("email", mentorEmails);
+
+        if (mentorUsersError) {
+            console.error(
+                "Could not load mentor names:",
+                mentorUsersError
+            );
+        } else {
+            mentors = mentorUsers || [];
+        }
+    }
+
+    console.log(
+        "Mentors from Supabase:",
+        mentors
+    );
+
+    const mentorMap = new Map(
+        mentors.map((mentor) => [
+            mentor.email,
+            mentor.name
+        ])
+    );
+
+    // --------------------------------------------------
+    // 5. COMBINE EVERYTHING
+    // --------------------------------------------------
+
+    discoverProjects = projects.map((project) => {
+
+        const projectMentors =
+            (mentorAssignments || [])
+                .filter(
+                    (assignment) =>
+                        assignment.project_code ===
+                        project.project_code
+                )
+                .map(
+                    (assignment) =>
+                        mentorMap.get(
+                            assignment.mentor_email
+                        ) || assignment.mentor_email
+                );
+
+        const mentorNames = [
+            ...new Set(
+                projectMentors.filter(Boolean)
+            )
+        ];
+
+        return {
+            id: project.project_code,
+
+            projectCode: project.project_code,
+
+            title: project.title,
+
+            summary:
+                project.description ||
+                project.summary ||
+                "",
+
+            expectedOutcome:
+                project.expected_outcome || "",
+
+            status:
+                project.status
+                    ? project.status.charAt(0).toUpperCase() +
+                      project.status.slice(1)
+                    : "Proposed",
+
+            progress: project.progress ?? 0,
+
+            cohort: project.academic_year || "",
+
+            semester: project.semester || "",
+
+            domains:
+               project.domains || [],
+
+            domain:
+               (project.domains && project.domains.length > 0)
+               ? project.domains.join(" · ")
+               : "Other",
+                
+                
+
+            mentor:
+                mentorNames.length > 0
+                    ? mentorNames.join(", ")
+                    : "Faculty mentor",
+
+            origin: "faculty"
+        };
+    });
+
+    console.log(
+        "Final Discover Projects:",
+        discoverProjects
+    );
+}
+
+/* ======================================================
+   INTERESTS
+   Stored in Supabase: expressions_of_interest
+====================================================== */
+
+let interests = [];
+
+/* Convert Supabase enum values into the UI format */
+function formatInterestStatus(status) {
+    if (!status) return "Pending";
+
+    return String(status)
+        .charAt(0)
+        .toUpperCase() +
+        String(status).slice(1).toLowerCase();
+}
+
+/* Find this student's interest for a specific project */
+function getInterest(projectId) {
+    return interests.find(
+        (interest) => interest.projectId === projectId
+    ) || null;
+}
+
+/* ------------------------------------------------------
+   LOAD MY INTERESTS FROM SUPABASE
+------------------------------------------------------ */
+
+async function loadStudentInterests() {
+    console.log("Loading student interests for:", userId);
+
+    const { data, error } =
+        await window.supabaseClient
+            .from("expressions_of_interest")
+            .select(`
+                student_email,
+                project_code,
+                status,
+                message,
+                submitted_at,
+                reviewed_by,
+                reviewed_at,
+                review_comment
+            `)
+            .eq("student_email", userId)
+            .order("submitted_at", {
                 ascending: false
             });
 
     if (error) {
         console.error(
-            "Could not load discover projects:",
-            error
-        );
-        return [];
-    }
-
-    return data || [];
-}
-
-
-/* ======================================================
-   SHAREPOINT WORKSPACES
-   Stored in Supabase:
-   project_workspaces
-   workspace_files
-====================================================== */
-
-let projectWorkspaceData = {};
-
-async function loadProjectWorkspaces(projectCodes) {
-    projectWorkspaceData = {};
-
-    if (!projectCodes || projectCodes.length === 0) {
-        return;
-    }
-
-    const { data: workspaces, error: workspaceError } =
-        await window.supabaseClient
-            .from("project_workspaces")
-            .select(`
-                workspace_id,
-                project_code,
-                workspace_name,
-                workspace_url,
-                provider,
-                created_by,
-                created_at,
-                updated_at
-            `)
-            .in("project_code", projectCodes);
-
-    if (workspaceError) {
-        console.error(
-            "Could not load project workspaces:",
-            workspaceError
-        );
-        return;
-    }
-
-    const workspaceIds = (workspaces || [])
-        .map((workspace) => workspace.workspace_id)
-        .filter(Boolean);
-
-    let files = [];
-
-    if (workspaceIds.length > 0) {
-        const { data: fileRows, error: filesError } =
-            await window.supabaseClient
-                .from("workspace_files")
-                .select(`
-                    file_id,
-                    workspace_id,
-                    title,
-                    note,
-                    file_url,
-                    file_name,
-                    file_type,
-                    file_size,
-                    added_by,
-                    added_at
-                `)
-                .in("workspace_id", workspaceIds)
-                .order("added_at", {
-                    ascending: false
-                });
-
-        if (filesError) {
-            console.error(
-                "Could not load workspace files:",
-                filesError
-            );
-        } else {
-            files = fileRows || [];
-        }
-    }
-
-    (workspaces || []).forEach((workspace) => {
-        projectWorkspaceData[workspace.project_code] = {
-            workspace,
-            files: files.filter(
-                (file) =>
-                    file.workspace_id === workspace.workspace_id
-            )
-        };
-    });
-}
-
-/* ======================================================
-   SHAREPOINT HTML
-====================================================== */
-
-function sharePointHtml(project) {
-    const projectCode =
-        project.projectCode || project.project_code;
-
-    const workspaceData =
-        projectWorkspaceData[projectCode];
-
-    if (!workspaceData || !workspaceData.workspace) {
-        return `
-            <div class="sharepoint-section">
-                <div class="sharepoint-header">
-                    <div>
-                        <h4>Project Workspace</h4>
-                        <p>Create a SharePoint workspace for this project.</p>
-                    </div>
-
-                    <button
-                        type="button"
-                        class="btn-primary"
-                        data-sp-create="${projectCode}"
-                    >
-                        Create SharePoint
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-
-    const workspace = workspaceData.workspace;
-    const files = workspaceData.files || [];
-
-    const filesHtml = files.length
-        ? files.map((file) => `
-            <div class="sharepoint-file">
-                <div class="sharepoint-file-info">
-                    <a
-                        href="${escapeHtml(file.file_url || "#")}"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        ${escapeHtml(file.title || file.file_name || "File")}
-                    </a>
-
-                    ${
-                        file.note
-                            ? `<p>${escapeHtml(file.note)}</p>`
-                            : ""
-                    }
-
-                    <small>
-                        Added by ${escapeHtml(file.added_by || "Student")}
-                        ${
-                            file.added_at
-                                ? ` · ${formatDate(file.added_at)}`
-                                : ""
-                        }
-                    </small>
-                </div>
-
-                <button
-                    type="button"
-                    class="btn-secondary"
-                    data-sp-remove="${projectCode}|${file.file_id}"
-                >
-                    Remove
-                </button>
-            </div>
-        `).join("")
-        : `
-            <div class="sharepoint-empty">
-                No files added yet.
-            </div>
-        `;
-
-    return `
-        <div class="sharepoint-section">
-
-            <div class="sharepoint-header">
-                <div>
-                    <h4>
-                        ${escapeHtml(
-                            workspace.workspace_name ||
-                            "Project Workspace"
-                        )}
-                    </h4>
-
-                    <p>
-                        SharePoint workspace
-                    </p>
-                </div>
-
-                ${
-                    workspace.workspace_url
-                        ? `
-                            <a
-                                href="${escapeHtml(workspace.workspace_url)}"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="btn-primary"
-                            >
-                                Open SharePoint
-                            </a>
-                        `
-                        : ""
-                }
-            </div>
-
-            <div class="sharepoint-files">
-                ${filesHtml}
-            </div>
-
-            <form
-                class="sharepoint-add-form"
-                data-sp-form="${projectCode}"
-            >
-                <input
-                    type="text"
-                    name="title"
-                    placeholder="File title"
-                    required
-                />
-
-                <input
-                    type="url"
-                    name="link"
-                    placeholder="SharePoint file URL"
-                    required
-                />
-
-                <input
-                    type="text"
-                    name="note"
-                    placeholder="Short note (optional)"
-                />
-
-                <button
-                    type="submit"
-                    class="btn-primary"
-                >
-                    Add File
-                </button>
-            </form>
-
-        </div>
-    `;
-}
-
-
-/* ======================================================
-   CREATE SUPABASE SHAREPOINT WORKSPACE
-====================================================== */
-
-async function createSupabaseWorkspace(projectCode) {
-    if (!projectCode) return;
-
-    const existing =
-        projectWorkspaceData[projectCode]?.workspace;
-
-    if (existing) {
-        showToast("Workspace already exists.");
-        return;
-    }
-
-    const project = studentProjects.find(
-        (item) => item.projectCode === projectCode
-    );
-
-    if (!project) {
-        showToast("Project not found.");
-        return;
-    }
-
-    const { error } =
-        await window.supabaseClient
-            .from("project_workspaces")
-            .insert({
-                project_code: projectCode,
-                workspace_name: `${project.title} workspace`,
-                provider: "sharepoint",
-                created_by: userId
-            });
-
-    if (error) {
-        console.error(
-            "Could not create SharePoint workspace:",
+            "Could not load student interests:",
             error
         );
 
-        showToast(
-            "Could not create SharePoint workspace."
-        );
-
+        interests = [];
         return;
     }
 
-    await loadProjectWorkspaces(
-        studentProjects.map(
-            (item) => item.projectCode
-        )
+    console.log(
+        "Student interests from Supabase:",
+        data
     );
 
-    showToast(
-        "SharePoint workspace created ✓"
-    );
+    interests = (data || []).map((row) => ({
+        projectId: row.project_code,
 
-    renderMyProjectsFull();
+        status: formatInterestStatus(row.status),
+
+        message: row.message || "",
+
+        submittedAt: row.submitted_at,
+
+        respondedAt: row.reviewed_at,
+
+        reviewedBy: row.reviewed_by || "",
+
+        reviewComment: row.review_comment || ""
+    }));
 }
 
-
-/* ======================================================
-   ADD FILE TO SUPABASE SHAREPOINT WORKSPACE
-====================================================== */
-
-async function addSupabaseWorkspaceFile(
-    projectCode,
-    { title, note, link }
-) {
-    const workspace =
-        projectWorkspaceData[projectCode]?.workspace;
-
-    if (!workspace) {
-        showToast(
-            "Create the SharePoint workspace first."
-        );
-        return;
-    }
-
-    const { error } =
-        await window.supabaseClient
-            .from("workspace_files")
-            .insert({
-                workspace_id: workspace.workspace_id,
-                title: title,
-                note: note || null,
-                file_url: link,
-                added_by: userId
-            });
-
-    if (error) {
-        console.error(
-            "Could not add workspace file:",
-            error
-        );
-
-        showToast(
-            "Could not add the file."
-        );
-
-        return;
-    }
-
-    await loadProjectWorkspaces(
-        studentProjects.map(
-            (item) => item.projectCode
-        )
-    );
-
-    showToast(
-        "File added ✓"
-    );
-
-    renderMyProjectsFull();
-}
-
-
-/* ======================================================
-   REMOVE FILE FROM SUPABASE SHAREPOINT WORKSPACE
-====================================================== */
-
-async function removeSupabaseWorkspaceFile(
-    projectCode,
-    fileId
-) {
-    if (!fileId) return;
-
-    const { error } =
-        await window.supabaseClient
-            .from("workspace_files")
-            .delete()
-            .eq("file_id", fileId);
-
-    if (error) {
-        console.error(
-            "Could not remove workspace file:",
-            error
-        );
-
-        showToast(
-            "Could not remove the file."
-        );
-
-        return;
-    }
-
-    await loadProjectWorkspaces(
-        studentProjects.map(
-            (item) => item.projectCode
-        )
-    );
-
-    showToast(
-        "File removed."
-    );
-
-    renderMyProjectsFull();
-}
-
-
-/* ======================================================
-   HELPERS
-====================================================== */
-
-function escapeHtml(value) {
-    if (value === null || value === undefined) {
-        return "";
-    }
-
-    return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-
-function formatDate(value) {
-    if (!value) return "";
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return "";
-    }
-
-    return date.toLocaleDateString(
-        undefined,
-        {
-            day: "numeric",
-            month: "short",
-            year: "numeric"
-        }
-    );
-}
-
-
-/* ======================================================
-   EXPRESS INTEREST
-====================================================== */
+/* ------------------------------------------------------
+   SUBMIT INTEREST
+------------------------------------------------------ */
 
 async function submitInterest(projectId) {
-    if (!projectId || !userId) {
+    if (!projectId) return;
+
+    /* Prevent duplicate submission in the UI */
+    if (getInterest(projectId)) {
+        showToast("You have already expressed interest in this project.");
         return;
     }
 
-    const existing = studentInterests.find(
-        (interest) =>
-            interest.project_code === projectId
+    console.log(
+        "Submitting interest:",
+        projectId,
+        "for student:",
+        userId
     );
-
-    if (existing) {
-        showToast(
-            `Interest already ${existing.status}.`
-        );
-        return;
-    }
 
     const { error } =
         await window.supabaseClient
@@ -787,82 +685,344 @@ async function submitInterest(projectId) {
             error
         );
 
+        /* PostgreSQL duplicate-key error */
+        if (error.code === "23505") {
+            showToast(
+                "You have already expressed interest in this project."
+            );
+
+            await loadStudentInterests();
+            renderAll();
+            return;
+        }
+
         showToast(
-            "Could not submit your interest."
+            "Could not submit your interest. Please try again."
         );
 
         return;
     }
 
+    /* Reload from Supabase so the UI reflects the real database */
     await loadStudentInterests();
 
-    showToast(
-        "Expression of interest submitted ✓"
-    );
+    showToast("Interest submitted ✓");
 
-    renderDiscoverProjects();
+    renderAll();
+}
+
+/* Demo affordance: since there's no faculty portal wired up
+   yet to accept/reject, clicking an already-pending interest
+   simulates the faculty response so the flow is visible. */
+function simulateFacultyResponse(projectId) {
+    const interest = getInterest(projectId);
+    if (!interest || interest.status !== "Pending") return;
+
+    const project = getAllProjects().find((p) => p.id === projectId);
+    const mentor = project ? project.mentor : "The faculty mentor";
+
+    interest.status = Math.random() < 0.6 ? "Accepted" : "Rejected";
+    interest.respondedAt = new Date().toISOString();
+    saveInterestsFor(userId, interests);
+    showToast(
+        interest.status === "Accepted"
+            ? `🎉 ${mentor} accepted you onto ${project ? project.title : "the project"}!`
+            : `${mentor} couldn't take you onto ${project ? project.title : "this project"} this time.`
+    );
+    renderAll();
 }
 
 
 /* ======================================================
-   PROJECT ACTION BUTTON
+   MY PROJECT (derived from an accepted interest)
+====================================================== */
+
+/* ======================================================
+   MY PROJECT
+   Actual membership comes from project_members
+====================================================== */
+
+function getMyProject() {
+    return studentProjects.length > 0
+        ? studentProjects[0]
+        : null;
+}
+
+function getMyProjects() {
+    return studentProjects || [];
+}
+
+
+/* ======================================================
+   TOAST
+====================================================== */
+
+let toastTimer = null;
+
+function showToast(message) {
+    const toast = document.getElementById("toast");
+    toast.textContent = message;
+    toast.classList.remove("hidden");
+
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+        toast.classList.add("hidden");
+    }, 2600);
+}
+
+
+/* ======================================================
+   TABS
+====================================================== */
+
+const tabButtons = document.querySelectorAll(".tab");
+const views = document.querySelectorAll(".view");
+const notifBtn = document.getElementById("notifBtn");
+
+function goToTab(tabName) {
+    tabButtons.forEach((btn) => {
+        btn.dataset.active = String(btn.dataset.tab === tabName);
+    });
+
+    views.forEach((view) => {
+        view.dataset.active = String(view.id === `view-${tabName}`);
+    });
+
+    if (notifBtn) {
+        notifBtn.dataset.active = String(tabName === "notifications");
+    }
+}
+
+tabButtons.forEach((btn) => {
+    btn.addEventListener("click", () => goToTab(btn.dataset.tab));
+});
+
+document.querySelectorAll("[data-goto]").forEach((btn) => {
+    btn.addEventListener("click", () => goToTab(btn.dataset.goto));
+});
+
+if (notifBtn) {
+    notifBtn.addEventListener("click", () => goToTab(notifBtn.dataset.tab));
+}
+
+
+/* ======================================================
+   LOGOUT
+====================================================== */
+
+function logout() {
+    localStorage.removeItem("loggedIn");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("selectedRole");
+    window.location.href = "index.html";
+}
+
+document.getElementById("logoutBtn").addEventListener("click", logout);
+document.getElementById("logoutBtnProfile").addEventListener("click", logout);
+
+
+/* ======================================================
+   DISCOVER: FILTER STATE
+====================================================== */
+
+const STATUSES = ["All", "Ongoing", "Proposed", "Completed"];
+let DOMAINS = ["All"];
+
+let activeStatus = "All";
+let activeDomain = "All";
+let activeMentor = "All";
+let searchTerm = "";
+
+function matchesFilters(project) {
+    const projectStatus =
+        String(project.status || "").trim().toLowerCase();
+
+    const selectedStatus =
+        String(activeStatus || "").trim().toLowerCase();
+
+    const projectDomains = (project.domains || [])
+    .map((domain) =>
+        String(domain).trim().toLowerCase()
+    );
+
+    const selectedDomain =
+       String(activeDomain || "").trim().toLowerCase();
+
+    const projectMentor =
+        String(project.mentor || "").trim().toLowerCase();
+
+    const selectedMentor =
+        String(activeMentor || "").trim().toLowerCase();
+
+    const statusMatch =
+        activeStatus === "All" ||
+        projectStatus === selectedStatus;
+
+   const domainMatch =
+      activeDomain === "All" ||
+      projectDomains.includes(selectedDomain);
+
+    const mentorMatch =
+        activeMentor === "All" ||
+        projectMentor === selectedMentor;
+
+    const term = searchTerm.toLowerCase();
+
+    const searchMatch =
+        !term ||
+        String(project.title || "").toLowerCase().includes(term) ||
+        String(project.summary || "").toLowerCase().includes(term) ||
+        String(project.domain || "").toLowerCase().includes(term) ||
+        String(project.mentor || "").toLowerCase().includes(term);
+
+    return (
+        statusMatch &&
+        domainMatch &&
+        mentorMatch &&
+        searchMatch
+    );
+}
+
+function statusBadgeClass(status) {
+    if (status === "Ongoing") return "badge-ongoing";
+    if (status === "Proposed") return "badge-proposed";
+    if (status === "Completed") return "badge-completed";
+    return "";
+}
+
+function interestBadgeClass(status) {
+    if (status === "Pending") return "badge-pending";
+    if (status === "Accepted") return "badge-accepted";
+    if (status === "Rejected") return "badge-rejected";
+    return "";
+}
+
+
+/* ======================================================
+   RENDER: HOME
+====================================================== */
+
+function renderHome() {
+    document.getElementById("greetingText").textContent = `Hi, ${studentName} 👋`;
+    document.getElementById("greetingSub").textContent = `Semester ${studentSemester} · ${cohortCodeFromSemester(studentSemester)} · ${userId}`;
+
+    // Active project comes from Supabase (project_members), same source as My Projects
+    const myProject = studentProjects.length > 0 ? studentProjects[0] : null;
+    const pendingCount = interests.filter((i) => i.status === "Pending").length;
+    const acceptedCount = interests.filter((i) => i.status === "Accepted").length;
+
+    document.getElementById("statRow").innerHTML = `
+        <div class="stat-card">
+            <p class="stat-value">${studentProjects.length}</p>
+            <p class="stat-label">Active project</p>
+        </div>
+        <div class="stat-card">
+            <p class="stat-value">${pendingCount}</p>
+            <p class="stat-label">Pending interests</p>
+        </div>
+        <div class="stat-card">
+            <p class="stat-value">${acceptedCount}</p>
+            <p class="stat-label">Accepted interests</p>
+        </div>
+    `;
+
+    const myProjectPanel = document.getElementById("myProjectPanel");
+
+    if (myProject) {
+        myProjectPanel.innerHTML = `
+            <div class="my-project-card">
+                <p class="my-project-title">${myProject.title}</p>
+                <p class="my-project-meta">${[myProject.domain, "Mentor: " + myProject.mentor].filter(Boolean).join(" · ")}</p>
+                <div class="progress-track">
+                    <div class="progress-fill" style="width:${myProject.progress}%"></div>
+                </div>
+                <p class="progress-label">${myProject.progress}% complete</p>
+            </div>
+        `;
+    } else {
+        myProjectPanel.innerHTML = `
+            <p class="empty-panel">
+                You're not on a project team yet. Browse
+                <a data-goto="discover">Discover Projects</a>
+                and express interest to get started.
+            </p>
+        `;
+        myProjectPanel.querySelector("[data-goto]").addEventListener("click", (e) => {
+            goToTab(e.target.dataset.goto);
+        });
+    }
+
+    const previewEl = document.getElementById("myInterestsPreview");
+    const recent = [...interests].reverse().slice(0, 3);
+
+    if (recent.length === 0) {
+        previewEl.innerHTML = `<p class="empty-panel">No interests submitted yet.</p>`;
+        return;
+    }
+
+    previewEl.innerHTML = recent.map((interest) => {
+        const project = getAllProjects().find((p) => p.id === interest.projectId);
+        if (!project) return "";
+        return `
+            <div class="mini-interest-row">
+                <div>
+                    <p class="mini-interest-title">${project.title}</p>
+                    <p class="mini-interest-domain">${project.domain}</p>
+                </div>
+                <span class="badge ${interestBadgeClass(interest.status)}">${interest.status}</span>
+            </div>
+        `;
+    }).join("");
+}
+
+
+/* ======================================================
+   RENDER: DISCOVER
 ====================================================== */
 
 function actionButtonHtml(project) {
-    const projectCode =
-        project.projectCode ||
-        project.project_code;
+    const interest = getInterest(project.id);
 
-    const interest =
-        studentInterests.find(
-            (item) =>
-                item.project_code === projectCode
-        );
-
+    /* Student has not expressed interest */
     if (!interest) {
         return `
             <button
-                type="button"
-                class="btn-primary"
-                data-express-interest="${projectCode}"
-            >
+                class="btn btn-primary"
+                data-express="${project.id}">
                 Express Interest
             </button>
         `;
     }
 
-    if (interest.status === "pending") {
+    /* Waiting for mentor */
+    if (interest.status === "Pending") {
         return `
             <button
-                type="button"
-                class="btn-secondary"
-                disabled
-            >
-                Pending
+                class="btn btn-pending"
+                disabled>
+                Interest Pending ✓
             </button>
         `;
     }
 
-    if (interest.status === "accepted") {
+    /* Mentor accepted */
+    if (interest.status === "Accepted") {
         return `
             <button
-                type="button"
-                class="btn-secondary"
-                disabled
-            >
-                Accepted
+                class="btn btn-accepted"
+                disabled>
+                Accepted ✓
             </button>
         `;
     }
 
-    if (interest.status === "rejected") {
+    /* Mentor rejected */
+    if (interest.status === "Rejected") {
         return `
             <button
-                type="button"
-                class="btn-secondary"
-                disabled
-            >
-                Rejected
+                class="btn btn-rejected"
+                disabled>
+                Not selected
             </button>
         `;
     }
@@ -870,98 +1030,317 @@ function actionButtonHtml(project) {
     return "";
 }
 
+function studentDiscoverMentors() {
+    return [
+        "All",
+        ...[
+            ...new Set(
+                discoverProjects
+                    .map((p) => p.mentor)
+                    .filter(Boolean)
+            )
+        ].sort()
+    ];
+}
 
-/* ======================================================
-   PROJECT CARD
-====================================================== */
+function renderDiscoverChips() {
+    document.getElementById("statusChips").innerHTML = STATUSES.map((status) => `
+        <button class="chip" data-status="${status}" data-active="${status === activeStatus}">${status}</button>
+    `).join("");
 
-function projectCardHtml(project) {
-    const projectCode =
-        project.projectCode ||
-        project.project_code;
+    document.getElementById("domainChips").innerHTML = DOMAINS.map((domain) => `
+        <button class="chip" data-domain-filter="${domain}" data-active="${domain === activeDomain}">${domain}</button>
+    `).join("");
 
-    return `
-        <article
-            class="project-card"
-            data-project-code="${escapeHtml(projectCode)}"
-        >
+    const mentorSelect = document.getElementById("discoverMentorSelect");
+    if (mentorSelect) {
+        mentorSelect.innerHTML = studentDiscoverMentors().map((m) =>
+            `<option value="${m}" ${m === activeMentor ? "selected" : ""}>${m === "All" ? "All professors" : m}</option>`
+        ).join("");
+    }
+}
 
-            ${
-                project.image_url
-                    ? `
-                        <img
-                            src="${escapeHtml(project.image_url)}"
-                            alt="${escapeHtml(project.title || "Project")}"
-                            class="project-card-image"
-                        />
-                    `
-                    : ""
-            }
+function renderDiscover() {
+    const filtered = discoverProjects.filter(matchesFilters);
+    const grid = document.getElementById("discoverGrid");
+    const empty = document.getElementById("discoverEmpty");
 
-            <div class="project-card-content">
+    document.getElementById("discoverCount").textContent =
+        `${filtered.length} project${filtered.length !== 1 ? "s" : ""}`;
 
-                <h3>
-                    ${escapeHtml(
-                        project.title ||
-                        "Untitled Project"
-                    )}
-                </h3>
+    if (filtered.length === 0) {
+        grid.innerHTML = "";
+        empty.classList.remove("hidden");
+        return;
+    }
 
-                ${
-                    project.summary ||
-                    project.description
-                        ? `
-                            <p>
-                                ${escapeHtml(
-                                    project.summary ||
-                                    project.description
-                                )}
-                            </p>
-                        `
-                        : ""
-                }
+    empty.classList.add("hidden");
 
-                <div class="project-card-meta">
-
-                    ${
-                        project.status
-                            ? `
-                                <span>
-                                    ${escapeHtml(
-                                        project.status
-                                    )}
-                                </span>
-                            `
-                            : ""
-                    }
-
-                    ${
-                        project.semester
-                            ? `
-                                <span>
-                                    Semester ${escapeHtml(
-                                        project.semester
-                                    )}
-                                </span>
-                            `
-                            : ""
-                    }
-
-                </div>
-
+    grid.innerHTML = filtered.map((project) => `
+        <article class="project-card">
+            <div class="project-card-top">
+                <span class="project-domain">${project.domain}</span>
+                <span class="badge ${statusBadgeClass(project.status)}">${project.status}</span>
+            </div>
+            <div class="project-card-body">
+                <h3 class="project-title" data-open="${project.id}">${project.title}</h3>
+                <div style="margin-bottom:8px;"><span class="origin-badge origin-${project.origin || "faculty"}">${projectOriginLabel(project)}</span></div>
+                <p class="project-description">${project.summary}</p>
+                <p class="project-mentor-row">${project.mentor}</p>
                 <div class="project-card-actions">
                     ${actionButtonHtml(project)}
+                    <button class="btn btn-secondary" data-open="${project.id}">Details</button>
+                </div>
+            </div>
+        </article>
+    `).join("");
+}
+
+
+/* ======================================================
+   RENDER: MY INTERESTS
+====================================================== */
+
+function renderInterests() {
+    const list = document.getElementById("interestsList");
+    const empty = document.getElementById("interestsEmpty");
+
+    if (interests.length === 0) {
+        list.innerHTML = "";
+        empty.classList.remove("hidden");
+        return;
+    }
+
+    empty.classList.add("hidden");
+
+    const sorted = [...interests].sort(
+        (a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)
+    );
+
+    list.innerHTML = sorted.map((interest) => {
+        const project = getAllProjects().find((p) => p.id === interest.projectId);
+        if (!project) return "";
+
+        const date = new Date(interest.submittedAt).toLocaleDateString("en-IN", {
+            day: "numeric", month: "short", year: "numeric"
+        });
+
+        return `
+            <div class="interest-row">
+                <div class="interest-row-main">
+                    <p class="interest-row-title" data-open="${project.id}">${project.title}</p>
+                    <p class="interest-row-meta">${project.domain} · ${project.mentor}</p>
+                </div>
+                <div class="interest-row-right">
+                    <span class="interest-date">${date}</span>
+                    <span class="badge ${interestBadgeClass(interest.status)}">${interest.status}</span>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+
+/* ======================================================
+   RENDER: PROFILE
+====================================================== */
+
+function renderProfile() {
+    document.getElementById("profileAvatar").textContent = studentName.charAt(0);
+    document.getElementById("profileName").textContent = studentName;
+    document.getElementById("profileMeta").textContent = `Student · Semester ${studentSemester}`;
+    document.getElementById("profileUserId").textContent = userId;
+}
+
+
+/* ======================================================
+   RENDER: MY PROJECTS (full tab)
+   Shows each project the student has been accepted onto:
+   mentor, teammates, status/progress, milestones, and a
+   SharePoint workspace where the team posts reports that
+   the faculty mentor and ILGC faculty can view.
+====================================================== */
+
+function milestoneListHtml(projectId) {
+    const milestones = (typeof PROJECT_MILESTONES !== "undefined" && PROJECT_MILESTONES[projectId]) || [];
+    if (!milestones.length) {
+        return `<p class="empty-panel">No milestones recorded yet.</p>`;
+    }
+    return `<div class="mp-milestones">${milestones.map((m) => `
+        <div class="mp-milestone ${m.done ? "done" : ""}">
+            <span class="mp-milestone-dot ${m.done ? "done" : ""}"></span>
+            <span class="mp-milestone-title">${m.title}</span>
+            <span class="mp-milestone-date">${m.date}</span>
+        </div>
+    `).join("")}</div>`;
+}
+
+function sharePointHtml(project) {
+    const sp = getSharePoint(project.id);
+
+    if (!sp) {
+        return `
+            <div class="mp-sharepoint">
+                <div class="mp-sharepoint-head">
+                    <div>
+                        <p class="mp-block-title">SharePoint workspace</p>
+                        <p class="mp-block-sub">Create a shared space to post reports. Your faculty mentor and the ILGC faculty will be able to view whatever you add here.</p>
+                    </div>
+                </div>
+                <button class="btn btn-primary" data-sp-create="${project.id}">+ Create SharePoint</button>
+            </div>
+        `;
+    }
+
+    const filesHtml = sp.files.length
+        ? sp.files.map((f) => {
+            const date = new Date(f.addedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+            const linkHtml = f.link
+                ? `<a class="mp-file-link" href="${f.link}" target="_blank" rel="noopener">Open report ↗</a>`
+                : "";
+            return `
+                <div class="mp-file">
+                    <div class="mp-file-main">
+                        <p class="mp-file-title">${f.title}</p>
+                        ${f.note ? `<p class="mp-file-note">${f.note}</p>` : ""}
+                        <p class="mp-file-meta">Added by ${f.addedBy} · ${date}</p>
+                    </div>
+                    <div class="mp-file-actions">
+                        ${linkHtml}
+                        <button class="btn btn-danger btn-small" data-sp-remove="${project.id}|${f.id}">Remove</button>
+                    </div>
+                </div>
+            `;
+        }).join("")
+        : `<p class="empty-panel">No reports posted yet. Add your first one below.</p>`;
+
+    return `
+        <div class="mp-sharepoint">
+            <div class="mp-sharepoint-head">
+                <div>
+                    <p class="mp-block-title">SharePoint workspace</p>
+                    <p class="mp-block-sub">Visible to you, your teammates, ${project.mentor}, and the ILGC faculty.</p>
+                </div>
+                <span class="badge badge-accepted">Active</span>
+            </div>
+
+            <div class="mp-file-list">${filesHtml}</div>
+
+            <form class="mp-report-form" data-sp-form="${project.id}">
+                <input type="text" data-sp-title placeholder="Report title (e.g. Progress Report — Sprint 3)" required>
+                <textarea data-sp-note placeholder="Short note on what's in this report (optional)"></textarea>
+                <input type="url" data-sp-link placeholder="Link to the report file (Google Doc, Drive, etc.) — optional">
+                <button type="submit" class="btn btn-primary">+ Add Report</button>
+            </form>
+        </div>
+    `;
+}
+
+function myProjectFullCardHtml(project) {
+    const teammates = (project.team || []).filter(
+        (member) => member.email !== userId
+    );
+
+    const teamHtml = teammates.length
+        ? `
+            <div class="modal-team">
+                ${teammates.map((member) => `
+                    <span class="team-chip">
+                        ${member.name}
+                    </span>
+                `).join("")}
+            </div>
+        `
+        : `
+            <p class="empty-panel">
+                You're the only student on this project so far.
+            </p>
+        `;
+
+    return `
+        <article class="mp-card">
+
+            <div class="mp-card-top">
+                <span class="project-domain">
+                    ${project.projectCode}
+                </span>
+
+                <span class="badge ${statusBadgeClass(project.status)}">
+                    ${project.status}
+                </span>
+            </div>
+
+            <h2 class="mp-title">
+                ${project.title}
+            </h2>
+
+            <p class="mp-summary">
+                ${project.summary}
+            </p>
+
+            <div class="mp-meta-grid">
+
+                <div class="mp-meta-item">
+                    <span class="meta-label">
+                        Academic year
+                    </span>
+
+                    <span class="meta-value">
+                        ${project.cohort || "—"}
+                    </span>
+                </div>
+
+                <div class="mp-meta-item">
+                    <span class="meta-label">
+                        Semester
+                    </span>
+
+                    <span class="meta-value">
+                        ${project.semester || "—"}
+                    </span>
+                </div>
+
+                <div class="mp-meta-item">
+                    <span class="meta-label">
+                        Progress
+                    </span>
+
+                    <span class="meta-value">
+                        ${project.progress}%
+                    </span>
                 </div>
 
             </div>
 
+            <div class="progress-track" style="margin-bottom:20px;">
+                <div
+                    class="progress-fill"
+                    style="width:${project.progress}%"
+                ></div>
+            </div>
+
+            <p class="mp-block-title">
+                Teammates
+            </p>
+
+            ${teamHtml}
+
+            <p
+                class="mp-block-title"
+                style="margin-top:22px;"
+            >
+                Project outcome
+            </p>
+
+            <p class="mp-summary">
+                ${project.expectedOutcome || "Not specified yet."}
+            </p>
+
+            ${sharePointHtml(project)}
+
         </article>
     `;
 }
-
-/* ======================================================
-   RENDER: MY PROJECTS
-====================================================== */
 
 function renderMyProjectsFull() {
     const container = document.getElementById("myProjectsFull");
@@ -979,22 +1358,12 @@ function renderMyProjectsFull() {
                 </p>
             </div>
         `;
-
         const link = container.querySelector("[data-goto]");
-
-        if (link) {
-            link.addEventListener(
-                "click",
-                (e) => goToTab(e.target.dataset.goto)
-            );
-        }
-
+        if (link) link.addEventListener("click", (e) => goToTab(e.target.dataset.goto));
         return;
     }
 
-    container.innerHTML = projects
-        .map(myProjectFullCardHtml)
-        .join("");
+    container.innerHTML = projects.map(myProjectFullCardHtml).join("");
 }
 
 
@@ -1002,131 +1371,52 @@ function renderMyProjectsFull() {
    MODAL
 ====================================================== */
 
-const modalOverlay =
-    document.getElementById("modalOverlay");
-
-const modalBody =
-    document.getElementById("modalBody");
-
+const modalOverlay = document.getElementById("modalOverlay");
+const modalBody = document.getElementById("modalBody");
 
 function openModal(projectId) {
-    const project =
-        getAllProjects().find(
-            (p) => p.id === projectId
-        );
-
+    const project = getAllProjects().find((p) => p.id === projectId);
     if (!project) return;
 
     const teamHtml = project.team.length
-        ? `
-            <div class="modal-team">
-                ${
-                    project.team
-                        .map(
-                            (m) =>
-                                `<span class="team-chip">${m.name} · Sem ${m.semester} · ${yearFromSemester(m.semester)}</span>`
-                        )
-                        .join("")
-                }
-            </div>
-        `
-        : `
-            <p class="modal-text">
-                No students assigned to this project yet.
-            </p>
-        `;
+        ? `<div class="modal-team">${project.team.map((m) => `<span class="team-chip">${m.name} · Sem ${m.semester} · ${yearFromSemester(m.semester)}</span>`).join("")}</div>`
+        : `<p class="modal-text">No students assigned to this project yet.</p>`;
 
-    const profEmail =
-        facultyEmail(project.mentor);
+    const profEmail = facultyEmail(project.mentor);
 
     modalBody.innerHTML = `
-        <p class="modal-eyebrow">
-            ${project.domain} · ${project.status}
-        </p>
-
-        <h2 class="modal-title">
-            ${project.title}
-        </h2>
-
-        <div style="margin-bottom:16px;">
-            <span class="origin-badge origin-${project.origin || "faculty"}">
-                ${projectOriginLabel(project)}
-            </span>
-        </div>
+        <p class="modal-eyebrow">${project.domain} · ${project.status}</p>
+        <h2 class="modal-title">${project.title}</h2>
+        <div style="margin-bottom:16px;"><span class="origin-badge origin-${project.origin || "faculty"}">${projectOriginLabel(project)}</span></div>
 
         <div class="modal-meta-row">
-
             <div class="modal-meta-item">
-                <span class="meta-label">
-                    Mentor
-                </span>
-
-                <span class="meta-value">
-                    ${project.mentor}
-                </span>
+                <span class="meta-label">Mentor</span>
+                <span class="meta-value">${project.mentor}</span>
             </div>
-
             <div class="modal-meta-item">
-                <span class="meta-label">
-                    Cohort
-                </span>
-
-                <span class="meta-value">
-                    ${project.cohort}
-                </span>
+                <span class="meta-label">Cohort</span>
+                <span class="meta-value">${project.cohort}</span>
             </div>
-
             <div class="modal-meta-item">
-                <span class="meta-label">
-                    Progress
-                </span>
-
-                <span class="meta-value">
-                    ${project.progress}%
-                </span>
+                <span class="meta-label">Progress</span>
+                <span class="meta-value">${project.progress}%</span>
             </div>
-
         </div>
 
-        <p class="modal-section-label">
-            Overview
-        </p>
+        <p class="modal-section-label">Overview</p>
+        <p class="modal-text">${project.summary}</p>
 
-        <p class="modal-text">
-            ${project.summary}
-        </p>
+        <p class="modal-section-label">Expected outcome</p>
+        <p class="modal-text">${project.expectedOutcome}</p>
 
-        <p class="modal-section-label">
-            Expected outcome
-        </p>
-
-        <p class="modal-text">
-            ${project.expectedOutcome}
-        </p>
-
-        <p class="modal-section-label">
-            Current team
-        </p>
-
+        <p class="modal-section-label">Current team</p>
         ${teamHtml}
 
-        <p class="modal-section-label">
-            Contact the professor
-        </p>
-
+        <p class="modal-section-label">Contact the professor</p>
         <div class="contact-prof">
-
-            <span class="contact-prof-email">
-                ${profEmail}
-            </span>
-
-            <button
-                class="btn btn-secondary btn-small"
-                data-email-prof="${project.id}"
-            >
-                ✉ Email ${project.mentor}
-            </button>
-
+            <span class="contact-prof-email">${profEmail}</span>
+            <button class="btn btn-secondary btn-small" data-email-prof="${project.id}">✉ Email ${project.mentor}</button>
         </div>
 
         <div class="modal-actions">
@@ -1137,25 +1427,14 @@ function openModal(projectId) {
     modalOverlay.classList.remove("hidden");
 }
 
-
-/* ======================================================
-   EMAIL PROFESSOR
-====================================================== */
-
+/* Open the student's mail client (Outlook web, with mailto fallback)
+   pre-addressed to the project's professor. */
 function emailProfessor(projectId) {
-    const project =
-        getAllProjects().find(
-            (p) => p.id === projectId
-        );
-
+    const project = getAllProjects().find((p) => p.id === projectId);
     if (!project) return;
 
-    const to =
-        facultyEmail(project.mentor);
-
-    const subject =
-        `ILGC — question about "${project.title}"`;
-
+    const to = facultyEmail(project.mentor);
+    const subject = `ILGC — question about "${project.title}"`;
     const body =
         `Dear ${project.mentor},\n\n` +
         `I'm interested in your ILGC project "${project.title}" and would like to know more. ` +
@@ -1167,273 +1446,124 @@ function emailProfessor(projectId) {
         `&subject=${encodeURIComponent(subject)}` +
         `&body=${encodeURIComponent(body)}`;
 
-    const win =
-        window.open(
-            outlookUrl,
-            "_blank",
-            "noopener"
-        );
-
+    const win = window.open(outlookUrl, "_blank", "noopener");
     if (!win) {
         window.location.href =
             `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     }
-
-    showToast(
-        `Opening email to ${project.mentor} ✉`
-    );
+    showToast(`Opening email to ${project.mentor} ✉`);
 }
-
 
 function closeModal() {
     modalOverlay.classList.add("hidden");
 }
 
-
-document
-    .getElementById("modalClose")
-    .addEventListener(
-        "click",
-        closeModal
-    );
-
-
-modalOverlay.addEventListener(
-    "click",
-    (e) => {
-        if (e.target === modalOverlay) {
-            closeModal();
-        }
-    }
-);
-
-
-document.addEventListener(
-    "keydown",
-    (e) => {
-        if (e.key === "Escape") {
-            closeModal();
-        }
-    }
-);
+document.getElementById("modalClose").addEventListener("click", closeModal);
+modalOverlay.addEventListener("click", (e) => {
+    if (e.target === modalOverlay) closeModal();
+});
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeModal();
+});
 
 
 /* ======================================================
    EVENT DELEGATION
 ====================================================== */
 
-document
-    .getElementById("statusChips")
-    .addEventListener("click", (e) => {
+document.getElementById("statusChips").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-status]");
+    if (!btn) return;
+    activeStatus = btn.dataset.status;
+    renderDiscoverChips();
+    renderDiscover();
+});
 
-        const btn =
-            e.target.closest("[data-status]");
+document.getElementById("domainChips").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-domain-filter]");
+    if (!btn) return;
+    activeDomain = btn.dataset.domainFilter;
+    renderDiscoverChips();
+    renderDiscover();
+});
 
-        if (!btn) return;
+document.getElementById("discoverSearch").addEventListener("input", (e) => {
+    searchTerm = e.target.value.trim();
+    renderDiscover();
+});
 
-        activeStatus =
-            btn.dataset.status;
+document.getElementById("discoverMentorSelect").addEventListener("change", (e) => {
+    activeMentor = e.target.value;
+    renderDiscover();
+});
 
-        renderDiscoverChips();
-        renderDiscover();
-    });
+document.addEventListener("click", (e) => {
+    const expressBtn = e.target.closest("[data-express]");
 
-
-document
-    .getElementById("domainChips")
-    .addEventListener("click", (e) => {
-
-        const btn =
-            e.target.closest(
-                "[data-domain-filter]"
-            );
-
-        if (!btn) return;
-
-        activeDomain =
-            btn.dataset.domainFilter;
-
-        renderDiscoverChips();
-        renderDiscover();
-    });
-
-
-document
-    .getElementById("discoverSearch")
-    .addEventListener(
-        "input",
-        (e) => {
-            searchTerm =
-                e.target.value.trim();
-
-            renderDiscover();
-        }
-    );
-
-
-document
-    .getElementById("discoverMentorSelect")
-    .addEventListener(
-        "change",
-        (e) => {
-            activeMentor =
-                e.target.value;
-
-            renderDiscover();
-        }
-    );
-
-
-/* ======================================================
-   DOCUMENT CLICK HANDLER
-====================================================== */
-
-document.addEventListener(
-    "click",
-    async (e) => {
-
-        const expressBtn =
-            e.target.closest("[data-express]");
-
-        if (expressBtn) {
-            submitInterest(
-                expressBtn.dataset.express
-            );
-
-            return;
-        }
-
-
-        const emailProf =
-            e.target.closest(
-                "[data-email-prof]"
-            );
-
-        if (emailProf) {
-            emailProfessor(
-                emailProf.dataset.emailProf
-            );
-
-            return;
-        }
-
-
-        const openBtn =
-            e.target.closest("[data-open]");
-
-        if (openBtn) {
-            openModal(
-                openBtn.dataset.open
-            );
-
-            return;
-        }
-
-
-        /* ----------------------------------------------
-           SHAREPOINT: CREATE WORKSPACE
-        ---------------------------------------------- */
-
-        const spCreate =
-            e.target.closest(
-                "[data-sp-create]"
-            );
-
-        if (spCreate) {
-
-            await createSupabaseWorkspace(
-                spCreate.dataset.spCreate
-            );
-
-            return;
-        }
-
-
-        /* ----------------------------------------------
-           SHAREPOINT: REMOVE FILE
-        ---------------------------------------------- */
-
-        const spRemove =
-            e.target.closest(
-                "[data-sp-remove]"
-            );
-
-        if (spRemove) {
-
-            const [
-                projectCode,
-                fileId
-            ] =
-                spRemove.dataset.spRemove
-                    .split("|");
-
-            await removeSupabaseWorkspaceFile(
-                projectCode,
-                fileId
-            );
-
-            return;
-        }
+    if (expressBtn) {
+        submitInterest(expressBtn.dataset.express);
+        return;
     }
-);
 
+    const emailProf = e.target.closest("[data-email-prof]");
 
-/* ======================================================
-   SHAREPOINT FILE FORM SUBMISSION
-====================================================== */
+    if (emailProf) {
+        emailProfessor(emailProf.dataset.emailProf);
+        return;
+    }
 
-document.addEventListener(
-    "submit",
-    async (e) => {
+    const openBtn = e.target.closest("[data-open]");
 
-        const form =
-            e.target.closest(
-                "[data-sp-form]"
-            );
+    if (openBtn) {
+        openModal(openBtn.dataset.open);
+        return;
+    }
 
-        if (!form) return;
+    const spCreate = e.target.closest("[data-sp-create]");
 
-        e.preventDefault();
-
-        const projectCode =
-            form.dataset.spForm;
-
-        const title =
-            form
-                .querySelector("[data-sp-title]")
-                .value
-                .trim();
-
-        const note =
-            form
-                .querySelector("[data-sp-note]")
-                .value
-                .trim();
-
-        const link =
-            form
-                .querySelector("[data-sp-link]")
-                .value
-                .trim();
-
-        if (!title) {
-            showToast(
-                "Please enter a report title."
-            );
-
-            return;
-        }
-
-        await addSupabaseWorkspaceFile(
-            projectCode,
-            {
-                title,
-                note,
-                link
-            }
+    if (spCreate) {
+        createSharePoint(
+            spCreate.dataset.spCreate,
+            studentName
         );
+
+        showToast("SharePoint workspace created ✓");
+        renderMyProjectsFull();
+        return;
     }
-);
+
+    const spRemove = e.target.closest("[data-sp-remove]");
+
+    if (spRemove) {
+        const [projectId, fileId] =
+            spRemove.dataset.spRemove.split("|");
+
+        removeSharePointFile(projectId, fileId);
+
+        showToast("Report removed");
+        renderMyProjectsFull();
+        return;
+    }
+});
+
+/* SharePoint "add report" form submissions */
+document.addEventListener("submit", (e) => {
+    const form = e.target.closest("[data-sp-form]");
+    if (!form) return;
+    e.preventDefault();
+
+    const projectId = form.dataset.spForm;
+    const title = form.querySelector("[data-sp-title]").value;
+    const note = form.querySelector("[data-sp-note]").value;
+    const link = form.querySelector("[data-sp-link]").value;
+
+    if (!title.trim()) return;
+
+    addSharePointFile(projectId, { title, note, link, addedBy: studentName });
+    showToast("Report added to SharePoint ✓");
+    renderMyProjectsFull();
+});
+
 
 /* ======================================================
    FLOAT AN IDEA (student proposes a project)
@@ -1473,775 +1603,275 @@ function buildProposalRow(f) {
 }
 
 async function loadFloatMentors() {
-    const { data: profiles, error } =
-        await window.supabaseClient
-            .from("mentor_profiles")
-            .select("*");
+    const { data: profiles, error } = await window.supabaseClient
+        .from("mentor_profiles")
+        .select("*");
 
     if (error) {
-        console.error(
-            "Could not load mentors:",
-            error
-        );
-
+        console.error("Could not load mentors:", error);
         floatMentors = [];
         return;
     }
 
-    const rows = (profiles || [])
-        .map((r) => ({
-            email:
-                r.email ||
-                r.mentor_email ||
-                r.user_email ||
-                "",
-
-            fallbackName:
-                r.name ||
-                r.full_name ||
-                ""
-        }))
-        .filter((r) => r.email);
+    const rows = (profiles || []).map((r) => ({
+        email: r.email || r.mentor_email || r.user_email || "",
+        fallbackName: r.name || r.full_name || ""
+    })).filter((r) => r.email);
 
     let userRows = [];
-
     if (rows.length > 0) {
-        const { data } =
-            await window.supabaseClient
-                .from("users")
-                .select("email, name")
-                .in(
-                    "email",
-                    rows.map((r) => r.email)
-                );
-
+        const { data } = await window.supabaseClient
+            .from("users")
+            .select("email, name")
+            .in("email", rows.map((r) => r.email));
         userRows = data || [];
     }
+    const nameByEmail = new Map(userRows.map((u) => [u.email, u.name]));
 
-    const nameByEmail =
-        new Map(
-            userRows.map(
-                (u) => [u.email, u.name]
-            )
-        );
+    floatMentors = rows.map((r) => ({
+        email: r.email,
+        name: nameByEmail.get(r.email) || r.fallbackName || r.email
+    })).sort((a, b) => a.name.localeCompare(b.name));
 
-    floatMentors = rows
-        .map((r) => ({
-            email: r.email,
-
-            name:
-                nameByEmail.get(r.email) ||
-                r.fallbackName ||
-                r.email
-        }))
-        .sort(
-            (a, b) =>
-                a.name.localeCompare(b.name)
-        );
-
-    console.log(
-        "Mentors for Float an Idea:",
-        floatMentors
-    );
+    console.log("Mentors for Float an Idea:", floatMentors);
 }
 
-
 async function loadFloatDomains() {
-    const { data, error } =
-        await window.supabaseClient
-            .from("project_domains")
-            .select("name")
-            .order("name");
+    const { data, error } = await window.supabaseClient
+        .from("project_domains")
+        .select("name")
+        .order("name");
 
     if (error) {
-        console.error(
-            "Could not load domains:",
-            error
-        );
-
+        console.error("Could not load domains:", error);
         floatDomains = [];
         return;
     }
-
-    floatDomains = [
-        ...new Set(
-            (data || [])
-                .map((d) => d.name)
-                .filter(Boolean)
-        )
-    ];
+    floatDomains = [...new Set((data || []).map((d) => d.name).filter(Boolean))];
 }
 
-
-function mapProposalRow(
-    r,
-    nameByEmail
-) {
-    const mentorEmail =
-        r.mentor_email ||
-        r.target_mentor_email ||
-        "";
-
-    const studentEmail =
-        r.student_email ||
-        r.proposed_by ||
-        r.created_by ||
-        "";
-
-    const status =
-        String(
-            r.status || "pending"
-        );
-
+function mapProposalRow(r, nameByEmail) {
+    const mentorEmail = r.mentor_email || r.target_mentor_email || "";
+    const studentEmail = r.student_email || r.proposed_by || r.created_by || "";
+    const status = String(r.status || "pending");
     return {
-        id:
-            r.proposal_id ??
-            r.id ??
-            `${studentEmail}-${r.created_at}`,
-
-        title:
-            r.title ||
-            "Untitled idea",
-
-        studentUserId:
-            studentEmail,
-
-        studentName:
-            nameByEmail.get(studentEmail) ||
-            studentEmail ||
-            "A student",
-
-        domain:
-            r.domain ||
-            r.domain_name ||
-            "General",
-
-        targetMentor:
-            nameByEmail.get(mentorEmail) ||
-            mentorEmail ||
-            "a mentor",
-
-        proposedDate:
-            String(
-                r.created_at ||
-                r.proposed_at ||
-                r.submitted_at ||
-                ""
-            ).slice(0, 10),
-
-        status:
-            status
-                .split(/[_\s]+/)
-                .map(
-                    (w) =>
-                        w.charAt(0).toUpperCase() +
-                        w.slice(1).toLowerCase()
-                )
-                .join(" "),
-
-        mentorFeedback:
-            r.mentor_feedback ||
-            r.feedback ||
-            ""
+        id: r.proposal_id ?? r.id ?? `${studentEmail}-${r.created_at}`,
+        title: r.title || "Untitled idea",
+        studentUserId: studentEmail,
+        studentName: nameByEmail.get(studentEmail) || studentEmail || "A student",
+        domain: r.domain || r.domain_name || "General",
+        targetMentor: nameByEmail.get(mentorEmail) || mentorEmail || "a mentor",
+        proposedDate: String(r.created_at || r.proposed_at || r.submitted_at || "").slice(0, 10),
+        status: status.split(/[_\s]+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" "),
+        mentorFeedback: r.mentor_feedback || r.feedback || ""
     };
 }
 
-
 async function loadStudentIdeas() {
-    const { data, error } =
-        await window.supabaseClient
-            .from("project_proposals")
-            .select("*");
+    const { data, error } = await window.supabaseClient
+        .from("project_proposals")
+        .select("*");
 
     if (error) {
-        console.error(
-            "Could not load ideas:",
-            error
-        );
-
+        console.error("Could not load ideas:", error);
         supabaseIdeas = [];
         return;
     }
 
-    const emails = [
-        ...new Set(
-            (data || [])
-                .flatMap((r) => [
-                    r.student_email,
-                    r.proposed_by,
-                    r.created_by,
-                    r.mentor_email,
-                    r.target_mentor_email
-                ])
-                .filter(Boolean)
-        )
-    ];
+    const emails = [...new Set((data || []).flatMap((r) => [
+        r.student_email, r.proposed_by, r.created_by, r.mentor_email, r.target_mentor_email
+    ]).filter(Boolean))];
 
     let userRows = [];
-
     if (emails.length > 0) {
-        const { data: u } =
-            await window.supabaseClient
-                .from("users")
-                .select("email, name")
-                .in(
-                    "email",
-                    emails
-                );
-
+        const { data: u } = await window.supabaseClient
+            .from("users").select("email, name").in("email", emails);
         userRows = u || [];
     }
+    const nameByEmail = new Map(userRows.map((u) => [u.email, u.name]));
 
-    const nameByEmail =
-        new Map(
-            userRows.map(
-                (u) => [u.email, u.name]
-            )
-        );
-
-    supabaseIdeas =
-        (data || []).map(
-            (r) =>
-                mapProposalRow(
-                    r,
-                    nameByEmail
-                )
-        );
-
-    console.log(
-        "Ideas from Supabase:",
-        supabaseIdeas
-    );
+    supabaseIdeas = (data || []).map((r) => mapProposalRow(r, nameByEmail));
+    console.log("Ideas from Supabase:", supabaseIdeas);
 }
 
-
-// Ideas shown in this dashboard: Supabase + any that
-// couldn't be saved yet (local fallback).
+// Ideas shown in this dashboard: Supabase + any that couldn't be saved yet (local fallback).
 function getStudentIdeas() {
-    const localOnly =
-        (loadIdeaOverlay().added || [])
-            .filter(
-                (i) =>
-                    i.studentUserId === userId
-            );
-
-    return [
-        ...supabaseIdeas,
-        ...localOnly
-    ];
+    const localOnly = (loadIdeaOverlay().added || []).filter((i) => i.studentUserId === userId);
+    return [...supabaseIdeas, ...localOnly];
 }
-
 
 function openFloatIdeaModal() {
     modalBody.innerHTML = `
-        <p class="modal-eyebrow">
-            YOUR IDEA
-        </p>
+        <p class="modal-eyebrow">YOUR IDEA</p>
+        <h2 class="modal-title">Float a Project Idea</h2>
+        <p class="modal-text" style="margin-bottom:18px;">Propose your own project. It'll be sent to a mentor for review and will be visible to the ILGC faculty and mentors, marked as floated by you.</p>
 
-        <h2 class="modal-title">
-            Float a Project Idea
-        </h2>
-
-        <p
-            class="modal-text"
-            style="margin-bottom:18px;"
-        >
-            Propose your own project. It'll be sent to a
-            mentor for review and will be visible to the
-            ILGC faculty and mentors, marked as floated by you.
-        </p>
-
-        <form
-            id="floatIdeaForm"
-            class="float-form"
-        >
-
-            <label class="float-label">
-                Project title
-
-                <input
-                    type="text"
-                    id="fiTitle"
-                    required
-                    placeholder="e.g. SmartBin: AI Waste Sorting"
-                >
+        <form id="floatIdeaForm" class="float-form">
+            <label class="float-label">Project title
+                <input type="text" id="fiTitle" required placeholder="e.g. SmartBin: AI Waste Sorting">
             </label>
 
-            <label class="float-label">
-                Domain
-
+            <label class="float-label">Domain
                 <select id="fiDomain">
-                    ${
-                        floatDomains.length
-                            ? floatDomains
-                                .map(
-                                    (d) =>
-                                        `<option value="${d}">${d}</option>`
-                                )
-                                .join("")
-                            : `
-                                <option value="General">
-                                    General
-                                </option>
-                            `
-                    }
+                    ${floatDomains.length
+                        ? floatDomains.map((d) => `<option value="${d}">${d}</option>`).join("")
+                        : `<option value="General">General</option>`}
                 </select>
             </label>
 
-            <label class="float-label">
-                Send to mentor
-
-                <select
-                    id="fiMentor"
-                    required
-                >
-                    ${
-                        floatMentors.length
-                            ? floatMentors
-                                .map(
-                                    (m) =>
-                                        `<option value="${m.email}">${m.name}</option>`
-                                )
-                                .join("")
-                            : `
-                                <option
-                                    value=""
-                                    disabled
-                                    selected
-                                >
-                                    No mentors available
-                                </option>
-                            `
-                    }
+            <label class="float-label">Send to mentor
+                <select id="fiMentor" required>
+                    ${floatMentors.length
+                        ? floatMentors.map((m) => `<option value="${m.email}">${m.name}</option>`).join("")
+                        : `<option value="" disabled selected>No mentors available</option>`}
                 </select>
             </label>
 
-            <label class="float-label">
-                Problem statement
-
-                <textarea
-                    id="fiProblem"
-                    required
-                    placeholder="What problem does this solve?"
-                ></textarea>
+            <label class="float-label">Problem statement
+                <textarea id="fiProblem" required placeholder="What problem does this solve?"></textarea>
             </label>
 
-            <label class="float-label">
-                Scope
-
-                <textarea
-                    id="fiScope"
-                    required
-                    placeholder="What would you actually build?"
-                ></textarea>
+            <label class="float-label">Scope
+                <textarea id="fiScope" required placeholder="What would you actually build?"></textarea>
             </label>
 
-            <label class="float-label">
-                Tags (comma-separated)
-
-                <input
-                    type="text"
-                    id="fiTags"
-                    placeholder="e.g. AI, Sustainability"
-                >
+            <label class="float-label">Tags (comma-separated)
+                <input type="text" id="fiTags" placeholder="e.g. AI, Sustainability">
             </label>
 
             <div class="modal-actions">
-                <button
-                    type="submit"
-                    class="btn btn-primary"
-                >
-                    Float this idea
-                </button>
+                <button type="submit" class="btn btn-primary">Float this idea</button>
             </div>
-
         </form>
     `;
 
-    modalOverlay.classList.remove(
-        "hidden"
-    );
+    modalOverlay.classList.remove("hidden");
 
-    document
-        .getElementById("floatIdeaForm")
-        .addEventListener(
-            "submit",
-            async (e) => {
+    document.getElementById("floatIdeaForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const title = document.getElementById("fiTitle").value.trim();
+        if (!title) return;
 
-                e.preventDefault();
+        const mentorEmail = document.getElementById("fiMentor").value;
+        if (!mentorEmail) {
+            showToast("Please choose a mentor");
+            return;
+        }
+        const mentor = floatMentors.find((m) => m.email === mentorEmail);
 
-                const title =
-                    document
-                        .getElementById(
-                            "fiTitle"
-                        )
-                        .value
-                        .trim();
+        const fields = {
+            title,
+            domain: document.getElementById("fiDomain").value,
+            mentorEmail,
+            problem: document.getElementById("fiProblem").value.trim(),
+            scope: document.getElementById("fiScope").value.trim(),
+            tags: document.getElementById("fiTags").value
+                .split(",").map((t) => t.trim()).filter(Boolean)
+        };
 
-                if (!title) return;
+        const { error } = await window.supabaseClient
+            .from("project_proposals")
+            .insert(buildProposalRow(fields));
 
-                const mentorEmail =
-                    document
-                        .getElementById(
-                            "fiMentor"
-                        )
-                        .value;
+        if (error) {
+            console.error("Could not save idea to Supabase:", error);
+            // fallback so the idea isn't lost
+            addIdea({
+                id: `idea-${Date.now().toString(36)}`,
+                title,
+                studentName,
+                studentSemester,
+                studentUserId: userId,
+                domain: fields.domain,
+                problemStatement: fields.problem,
+                scope: fields.scope,
+                proposedDate: new Date().toISOString().slice(0, 10),
+                status: "Pending",
+                tags: fields.tags,
+                targetMentor: mentor ? mentor.name : mentorEmail,
+                origin: "student"
+            });
+            showToast("Saved locally only — check console (Supabase error)");
+        } else {
+            await loadStudentIdeas();
+            showToast("Idea floated ✓ — your mentor will review it");
+        }
 
-                if (!mentorEmail) {
-                    showToast(
-                        "Please choose a mentor"
-                    );
-
-                    return;
-                }
-
-                const mentor =
-                    floatMentors.find(
-                        (m) =>
-                            m.email ===
-                            mentorEmail
-                    );
-
-                const fields = {
-                    title,
-
-                    domain:
-                        document
-                            .getElementById(
-                                "fiDomain"
-                            )
-                            .value,
-
-                    mentorEmail,
-
-                    problem:
-                        document
-                            .getElementById(
-                                "fiProblem"
-                            )
-                            .value
-                            .trim(),
-
-                    scope:
-                        document
-                            .getElementById(
-                                "fiScope"
-                            )
-                            .value
-                            .trim(),
-
-                    tags:
-                        document
-                            .getElementById(
-                                "fiTags"
-                            )
-                            .value
-                            .split(",")
-                            .map(
-                                (t) =>
-                                    t.trim()
-                            )
-                            .filter(Boolean)
-                };
-
-                const { error } =
-                    await window.supabaseClient
-                        .from(
-                            "project_proposals"
-                        )
-                        .insert(
-                            buildProposalRow(
-                                fields
-                            )
-                        );
-
-                if (error) {
-                    console.error(
-                        "Could not save idea to Supabase:",
-                        error
-                    );
-
-                    // fallback so the idea isn't lost
-                    addIdea({
-                        id:
-                            `idea-${Date.now().toString(36)}`,
-
-                        title,
-
-                        studentName,
-
-                        studentSemester,
-
-                        studentUserId:
-                            userId,
-
-                        domain:
-                            fields.domain,
-
-                        problemStatement:
-                            fields.problem,
-
-                        scope:
-                            fields.scope,
-
-                        proposedDate:
-                            new Date()
-                                .toISOString()
-                                .slice(0, 10),
-
-                        status:
-                            "Pending",
-
-                        tags:
-                            fields.tags,
-
-                        targetMentor:
-                            mentor
-                                ? mentor.name
-                                : mentorEmail,
-
-                        origin:
-                            "student"
-                    });
-
-                    showToast(
-                        "Saved locally only — check console (Supabase error)"
-                    );
-
-                } else {
-
-                    await loadStudentIdeas();
-
-                    showToast(
-                        "Idea floated ✓ — your mentor will review it"
-                    );
-                }
-
-                closeModal();
-
-                renderMyIdeas();
-
-                renderNotifBadge();
-
-                goToTab(
-                    "myideas"
-                );
-            }
-        );
+        closeModal();
+        renderMyIdeas();
+        renderNotifBadge();
+        goToTab("myideas");
+    });
 }
 
 
 /* ======================================================
    RENDER: IDEAS (all student-floated ideas across ILGC)
+   Shows every idea floated by any student — the same pool
+   the faculty and mentors see — with the student's own
+   ideas marked. Filterable to just "Mine".
 ====================================================== */
 
 let ideasScope = "All";
 
-
 function ideaStatusBadgeClass(status) {
-
-    if (
-        status === "Accepted" ||
-        status === "Approved"
-    ) {
-        return "badge-accepted";
-    }
-
-    if (
-        status === "Rejected" ||
-        status === "Declined"
-    ) {
-        return "badge-rejected";
-    }
-
-    if (
-        status === "Needs Revision"
-    ) {
-        return "badge-pending";
-    }
-
+    if (status === "Accepted" || status === "Approved") return "badge-accepted";
+    if (status === "Rejected" || status === "Declined") return "badge-rejected";
+    if (status === "Needs Revision") return "badge-pending";
     return "badge-pending";
 }
 
-
 function isMyIdea(idea) {
-    return (
-        idea.studentUserId === userId ||
-        idea.studentName === studentName
-    );
+    return idea.studentUserId === userId || idea.studentName === studentName;
 }
-
 
 function renderIdeasScopeChips() {
-    const el =
-        document.getElementById(
-            "ideasScopeChips"
-        );
-
+    const el = document.getElementById("ideasScopeChips");
     if (!el) return;
-
-    el.innerHTML =
-        ["All", "Mine"]
-            .map(
-                (s) => `
-                    <button
-                        class="chip"
-                        data-ideas-scope="${s}"
-                        data-active="${s === ideasScope}"
-                    >
-                        ${
-                            s === "All"
-                                ? "All ideas"
-                                : "My ideas"
-                        }
-                    </button>
-                `
-            )
-            .join("");
+    el.innerHTML = ["All", "Mine"].map((s) => `
+        <button class="chip" data-ideas-scope="${s}" data-active="${s === ideasScope}">${s === "All" ? "All ideas" : "My ideas"}</button>
+    `).join("");
 }
 
-
 function renderMyIdeas() {
-
-    let ideas =
-        getStudentIdeas();
-
-    if (
-        ideasScope === "Mine"
-    ) {
-        ideas =
-            ideas.filter(
-                isMyIdea
-            );
+    let ideas = getStudentIdeas();
+    if (ideasScope === "Mine") {
+        ideas = ideas.filter(isMyIdea);
     }
-
     // newest first
-    ideas =
-        ideas
-            .slice()
-            .sort(
-                (a, b) =>
-                    new Date(
-                        b.proposedDate
-                    ) -
-                    new Date(
-                        a.proposedDate
-                    )
-            );
+    ideas = ideas.slice().sort((a, b) => new Date(b.proposedDate) - new Date(a.proposedDate));
 
-    const list =
-        document.getElementById(
-            "myIdeasList"
-        );
-
-    const empty =
-        document.getElementById(
-            "myIdeasEmpty"
-        );
-
+    const list = document.getElementById("myIdeasList");
+    const empty = document.getElementById("myIdeasEmpty");
     if (!list) return;
 
     if (ideas.length === 0) {
-
         list.innerHTML = "";
-
-        empty.classList.remove(
-            "hidden"
-        );
-
+        empty.classList.remove("hidden");
         return;
     }
+    empty.classList.add("hidden");
 
-    empty.classList.add(
-        "hidden"
-    );
-
-    list.innerHTML =
-        ideas
-            .map((idea) => {
-
-                const mine =
-                    isMyIdea(idea);
-
-                const who =
-                    mine
-                        ? "you"
-                        : idea.studentName;
-
-                const feedback =
-                    idea.mentorFeedback
-                        ? `
-                            <p
-                                class="idea-text"
-                                style="margin-top:8px;"
-                            >
-                                <strong>
-                                    Mentor feedback:
-                                </strong>
-
-                                ${idea.mentorFeedback}
-                            </p>
-                        `
-                        : "";
-
-                return `
-                    <div class="interest-row">
-
-                        <div
-                            class="interest-row-main"
-                        >
-
-                            <p
-                                class="interest-row-title"
-                            >
-                                ${idea.title}
-
-                                ${
-                                    mine
-                                        ? `
-                                            <span class="mine-tag">
-                                                Yours
-                                            </span>
-                                        `
-                                        : ""
-                                }
-                            </p>
-
-                            <p
-                                class="interest-row-meta"
-                            >
-                                ${idea.domain}
-                                · to ${idea.targetMentor}
-                                · floated ${idea.proposedDate}
-                            </p>
-
-                            <div
-                                style="margin-top:6px;"
-                            >
-                                <span
-                                    class="origin-badge origin-student"
-                                >
-                                    Student-floated · ${who}
-                                </span>
-                            </div>
-
-                            ${feedback}
-
-                        </div>
-
-                        <span
-                            class="badge ${ideaStatusBadgeClass(
-                                idea.status
-                            )}"
-                        >
-                            ${idea.status}
-                        </span>
-
-                    </div>
-                `;
-            })
-            .join("");
+    list.innerHTML = ideas.map((idea) => {
+        const mine = isMyIdea(idea);
+        const who = mine ? "you" : idea.studentName;
+        const feedback = idea.mentorFeedback
+            ? `<p class="idea-text" style="margin-top:8px;"><strong>Mentor feedback:</strong> ${idea.mentorFeedback}</p>`
+            : "";
+        return `
+            <div class="interest-row">
+                <div class="interest-row-main">
+                    <p class="interest-row-title">${idea.title}${mine ? ` <span class="mine-tag">Yours</span>` : ""}</p>
+                    <p class="interest-row-meta">${idea.domain} · to ${idea.targetMentor} · floated ${idea.proposedDate}</p>
+                    <div style="margin-top:6px;"><span class="origin-badge origin-student">Student-floated · ${who}</span></div>
+                    ${feedback}
+                </div>
+                <span class="badge ${ideaStatusBadgeClass(idea.status)}">${idea.status}</span>
+            </div>
+        `;
+    }).join("");
 }
+
 
 /* ======================================================
    RENDER: NOTIFICATIONS (student)
@@ -2251,234 +1881,81 @@ function buildNotifications() {
     const notifications = [];
 
     // Updates on my interests (accepted / rejected).
-    interests
-        .filter((i) => i.status !== "Pending")
-        .forEach((i) => {
-            const project =
-                getAllProjects().find(
-                    (p) => p.id === i.projectId
-                );
-
-            notifications.push({
-                icon:
-                    i.status === "Accepted"
-                        ? "🎉"
-                        : "📩",
-
-                date:
-                    (
-                        i.respondedAt ||
-                        i.submittedAt ||
-                        ""
-                    ).slice(0, 10),
-
-                text:
-                    i.status === "Accepted"
-                        ? `You were <strong>accepted</strong> onto ${
-                              project
-                                  ? project.title
-                                  : "a project"
-                          }.`
-                        : `Your interest in ${
-                              project
-                                  ? project.title
-                                  : "a project"
-                          } wasn't accepted this time.`
-            });
+    interests.filter((i) => i.status !== "Pending").forEach((i) => {
+        const project = getAllProjects().find((p) => p.id === i.projectId);
+        notifications.push({
+            icon: i.status === "Accepted" ? "🎉" : "📩",
+            date: (i.respondedAt || i.submittedAt || "").slice(0, 10),
+            text: i.status === "Accepted"
+                ? `You were <strong>accepted</strong> onto ${project ? project.title : "a project"}.`
+                : `Your interest in ${project ? project.title : "a project"} wasn't accepted this time.`
         });
-
+    });
 
     // Updates on my floated ideas.
-    getStudentIdeas()
-        .filter(isMyIdea)
-        .filter((i) => i.status !== "Pending")
-        .forEach((i) => {
-            notifications.push({
-                icon: "💡",
-
-                date:
-                    i.reviewedDate ||
-                    i.proposedDate,
-
-                text:
-                    `Your idea "<strong>${i.title}</strong>" ` +
-                    `is now <strong>${i.status}</strong>.`
-            });
+    getStudentIdeas().filter(isMyIdea).filter((i) => i.status !== "Pending").forEach((i) => {
+        notifications.push({
+            icon: "💡",
+            date: i.reviewedDate || i.proposedDate,
+            text: `Your idea "<strong>${i.title}</strong>" is now <strong>${i.status}</strong>.`
         });
-
+    });
 
     // New projects floated across ILGC (last few).
-    getAllProjects()
-        .filter((p) => p.floatedByName)
-        .slice(-4)
-        .forEach((p) => {
-            notifications.push({
-                icon: "✨",
-
-                date:
-                    p.proposedDate ||
-                    "2026-09-01",
-
-                text:
-                    `New ${
-                        projectOriginLabel(p)
-                            .split(" · ")[0]
-                            .toLowerCase()
-                    } project: <strong>${p.title}</strong>.`
-            });
+    getAllProjects().filter((p) => p.floatedByName).slice(-4).forEach((p) => {
+        notifications.push({
+            icon: "✨",
+            date: p.proposedDate || "2026-09-01",
+            text: `New ${projectOriginLabel(p).split(" · ")[0].toLowerCase()} project: <strong>${p.title}</strong>.`
         });
-
+    });
 
     return notifications
         .filter((n) => n.date)
-        .sort(
-            (a, b) =>
-                new Date(b.date) -
-                new Date(a.date)
-        );
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
 }
-
-
-/* ======================================================
-   RENDER NOTIFICATIONS
-====================================================== */
 
 function renderNotifications() {
-
-    const notifications =
-        buildNotifications();
-
-    const list =
-        document.getElementById(
-            "notificationsList"
-        );
-
+    const notifications = buildNotifications();
+    const list = document.getElementById("notificationsList");
     if (!list) return;
-
-    list.innerHTML =
-        notifications.length
-            ? notifications
-                  .map(
-                      (n) => `
-                        <div class="notification-item">
-
-                            <span
-                                class="notification-icon"
-                            >
-                                ${n.icon}
-                            </span>
-
-                            <span
-                                class="notification-text"
-                            >
-                                ${n.text}
-
-                                <span
-                                    class="notification-date"
-                                >
-                                    ${n.date}
-                                </span>
-                            </span>
-
-                        </div>
-                    `
-                  )
-                  .join("")
-            : `
-                <p class="empty-state">
-                    You're all caught up —
-                    no new notifications.
-                </p>
-            `;
+    list.innerHTML = notifications.length
+        ? notifications.map((n) => `
+            <div class="notification-item">
+                <span class="notification-icon">${n.icon}</span>
+                <span class="notification-text">${n.text}<span class="notification-date">${n.date}</span></span>
+            </div>
+        `).join("")
+        : `<p class="empty-state">You're all caught up — no new notifications.</p>`;
 }
-
-
-/* ======================================================
-   NOTIFICATION BADGE
-====================================================== */
 
 function renderNotifBadge() {
-
-    const count =
-        buildNotifications().length;
-
-    const badge =
-        document.getElementById(
-            "notifBadge"
-        );
-
+    const count = buildNotifications().length;
+    const badge = document.getElementById("notifBadge");
     if (!badge) return;
-
     if (count > 0) {
-
-        badge.textContent =
-            count > 9
-                ? "9+"
-                : String(count);
-
-        badge.classList.remove(
-            "hidden"
-        );
-
+        badge.textContent = count > 9 ? "9+" : String(count);
+        badge.classList.remove("hidden");
     } else {
-
-        badge.classList.add(
-            "hidden"
-        );
+        badge.classList.add("hidden");
     }
 }
 
-
-/* ======================================================
-   FLOAT AN IDEA BUTTONS
-====================================================== */
-
-[
-    "floatIdeaBtn",
-    "floatIdeaBtn2"
-].forEach((id) => {
-
-    const btn =
-        document.getElementById(id);
-
-    if (btn) {
-        btn.addEventListener(
-            "click",
-            openFloatIdeaModal
-        );
-    }
+// Wire the two "Float an Idea" buttons.
+["floatIdeaBtn", "floatIdeaBtn2"].forEach((id) => {
+    const btn = document.getElementById(id);
+    if (btn) btn.addEventListener("click", openFloatIdeaModal);
 });
 
-
-/* ======================================================
-   IDEAS SCOPE FILTER
-====================================================== */
-
-const ideasScopeChipsEl =
-    document.getElementById(
-        "ideasScopeChips"
-    );
-
+const ideasScopeChipsEl = document.getElementById("ideasScopeChips");
 if (ideasScopeChipsEl) {
-
-    ideasScopeChipsEl.addEventListener(
-        "click",
-        (e) => {
-
-            const btn =
-                e.target.closest(
-                    "[data-ideas-scope]"
-                );
-
-            if (!btn) return;
-
-            ideasScope =
-                btn.dataset.ideasScope;
-
-            renderIdeasScopeChips();
-            renderMyIdeas();
-        }
-    );
+    ideasScopeChipsEl.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-ideas-scope]");
+        if (!btn) return;
+        ideasScope = btn.dataset.ideasScope;
+        renderIdeasScopeChips();
+        renderMyIdeas();
+    });
 }
 
 
@@ -2487,66 +1964,26 @@ if (ideasScopeChipsEl) {
 ====================================================== */
 
 function renderAll() {
-
     renderHome();
-
     renderMyProjectsFull();
-
     renderDiscover();
-
     renderInterests();
-
     renderMyIdeas();
-
     renderNotifications();
-
     renderNotifBadge();
 }
 
-
-/* ======================================================
-   INITIAL RENDER
-====================================================== */
-
 renderDiscoverChips();
-
 renderIdeasScopeChips();
-
 renderProfile();
-
-
-/* ======================================================
-   INITIALIZE STUDENT DASHBOARD
-====================================================== */
-
 async function initStudentDashboard() {
-
     await loadStudentProfile();
 
     await loadStudentInterests();
 
-    studentProjects =
-        await loadStudentProjects();
-
-
-    /* ----------------------------------------------
-       SHAREPOINT / PROJECT WORKSPACES
-    ---------------------------------------------- */
-
-    await loadProjectWorkspaces(
-        studentProjects.map(
-            (project) =>
-                project.projectCode
-        )
-    );
-
+    studentProjects = await loadStudentProjects();
 
     await loadDiscoverProjects();
-
-
-    /* ----------------------------------------------
-       FLOAT AN IDEA DATA
-    ---------------------------------------------- */
 
     await Promise.all([
         loadFloatMentors(),
@@ -2554,59 +1991,31 @@ async function initStudentDashboard() {
         loadStudentIdeas()
     ]);
 
-
     renderDiscoverChips();
 
     renderAll();
 }
 
-
 initStudentDashboard();
-
 
 /* ======================================================
    SIDEBAR TOGGLE
+   Sections used to be a horizontally-scrolling row of tabs
+   up top; they now live in a left sidebar that can be
+   hidden/shown with the header toggle. State is remembered
+   per browser so it stays out of the way once dismissed.
 ====================================================== */
 
-const SIDEBAR_STATE_KEY =
-    "ilgc_sidebar_collapsed";
+const SIDEBAR_STATE_KEY = "ilgc_sidebar_collapsed";
 
-
-if (
-    localStorage.getItem(
-        SIDEBAR_STATE_KEY
-    ) === "true"
-) {
-
-    document.body.classList.add(
-        "sidebar-collapsed"
-    );
+if (localStorage.getItem(SIDEBAR_STATE_KEY) === "true") {
+    document.body.classList.add("sidebar-collapsed");
 }
 
-
-const sidebarToggleBtn =
-    document.getElementById(
-        "sidebarToggle"
-    );
-
-
+const sidebarToggleBtn = document.getElementById("sidebarToggle");
 if (sidebarToggleBtn) {
-
-    sidebarToggleBtn.addEventListener(
-        "click",
-        () => {
-
-            document.body.classList.toggle(
-                "sidebar-collapsed"
-            );
-
-            localStorage.setItem(
-                SIDEBAR_STATE_KEY,
-                document.body.classList.contains(
-                    "sidebar-collapsed"
-                )
-            );
-        }
-    );
+    sidebarToggleBtn.addEventListener("click", () => {
+        document.body.classList.toggle("sidebar-collapsed");
+        localStorage.setItem(SIDEBAR_STATE_KEY, document.body.classList.contains("sidebar-collapsed"));
+    });
 }
-
