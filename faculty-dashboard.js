@@ -2289,30 +2289,338 @@ function renderProfile() {
    SIMPLE PLACEHOLDER SECTIONS
 ====================================================== */
 
-function renderIdeas() {
+/* ======================================================
+   STUDENT IDEAS  (Supabase table: project_proposals)
+   Every idea a student floats lands here for ILGC faculty
+   to approve or reject.
+====================================================== */
+
+let ideasData = [];
+let ideasFilter = "All";
+
+function ideaStatusLabel(status) {
+
+    return String(status || "pending")
+        .split(/[_\s]+/)
+        .map((w) =>
+            w.charAt(0).toUpperCase() +
+            w.slice(1).toLowerCase()
+        )
+        .join(" ");
+}
+
+
+async function renderIdeas() {
 
     const list =
-        document.getElementById(
-            "ideasList"
-        );
+        document.getElementById("ideasList");
 
     const empty =
-        document.getElementById(
-            "ideasEmpty"
-        );
+        document.getElementById("ideasEmpty");
 
     if (!list || !empty) {
         return;
     }
 
-    list.innerHTML = "";
+    const { data, error } =
+        await window.supabaseClient
+            .from("project_proposals")
+            .select("*")
+            .order("created_at", { ascending: false });
 
-    empty.classList.remove(
-        "hidden"
+    if (error) {
+        console.error(
+            "Could not load student ideas:",
+            error
+        );
+
+        list.innerHTML = "";
+        empty.classList.remove("hidden");
+        empty.textContent =
+            "Could not load student ideas.";
+
+        return;
+    }
+
+    const rows = data || [];
+
+    const emails = [
+        ...new Set(
+            rows
+                .map((r) => r.submitted_by)
+                .filter(Boolean)
+        )
+    ];
+
+    let nameByEmail = new Map();
+
+    if (emails.length > 0) {
+        const { data: users } =
+            await window.supabaseClient
+                .from("users")
+                .select("email, name")
+                .in("email", emails);
+
+        nameByEmail = new Map(
+            (users || []).map((u) => [u.email, u.name])
+        );
+    }
+
+    const { data: domainRows } =
+        await window.supabaseClient
+            .from("project_domains")
+            .select("domain_id, name");
+
+    const domainNameById = new Map(
+        (domainRows || []).map((d) => [d.domain_id, d.name])
     );
 
-    empty.textContent =
-        "Student idea management will be connected to Supabase next.";
+    ideasData = rows.map((r) => ({
+        id: r.proposal_id,
+        title: r.title || "Untitled idea",
+        description: r.description || "",
+        studentEmail: r.submitted_by || "",
+        studentName:
+            nameByEmail.get(r.submitted_by) ||
+            r.submitted_by ||
+            "A student",
+        domain:
+            domainNameById.get(r.domain_id) || "General",
+        date: String(r.created_at || "").slice(0, 10),
+        status: String(r.status || "pending").toLowerCase(),
+        comment: r.review_comment || "",
+        reviewedBy: r.reviewed_by || ""
+    }));
+
+    drawIdeas();
+}
+
+
+function drawIdeas() {
+
+    const chips =
+        document.getElementById("ideasStatusChips");
+
+    const list =
+        document.getElementById("ideasList");
+
+    const empty =
+        document.getElementById("ideasEmpty");
+
+    if (!chips || !list || !empty) {
+        return;
+    }
+
+    const statuses = [
+        "All",
+        ...new Set([
+            "pending",
+            "approved",
+            "rejected",
+            ...ideasData.map((i) => i.status)
+        ])
+    ];
+
+    chips.innerHTML = "";
+
+    statuses.forEach((status) => {
+
+        const btn =
+            document.createElement("button");
+
+        btn.type = "button";
+        btn.className = "chip";
+        btn.textContent =
+            status === "All"
+                ? "All"
+                : ideaStatusLabel(status);
+
+        btn.dataset.active =
+            String(status === ideasFilter);
+
+        btn.addEventListener("click", () => {
+            ideasFilter = status;
+            drawIdeas();
+        });
+
+        chips.appendChild(btn);
+    });
+
+    const visible = ideasData.filter(
+        (i) =>
+            ideasFilter === "All" ||
+            i.status === ideasFilter
+    );
+
+    list.innerHTML = "";
+
+    if (!visible.length) {
+        empty.classList.remove("hidden");
+        empty.textContent =
+            "No student ideas match this status.";
+        return;
+    }
+
+    empty.classList.add("hidden");
+
+    visible.forEach((idea) => {
+
+        const card =
+            document.createElement("div");
+
+        card.style.cssText =
+            "background:#fff;border:1px solid #DCE8EA;" +
+            "border-radius:18px;padding:20px 22px;" +
+            "margin-bottom:16px;";
+
+        const top =
+            document.createElement("div");
+
+        top.style.cssText =
+            "display:flex;justify-content:space-between;" +
+            "align-items:flex-start;gap:12px;";
+
+        const title =
+            document.createElement("h3");
+
+        title.textContent = idea.title;
+        title.style.cssText =
+            "font-family:'Merriweather',serif;" +
+            "font-size:18px;color:#17313A;margin:0;";
+
+        const badge =
+            document.createElement("span");
+
+        badge.textContent =
+            ideaStatusLabel(idea.status);
+
+        badge.style.cssText =
+            "padding:4px 12px;border-radius:999px;" +
+            "font-size:12px;font-weight:700;" +
+            "background:#E8F3F1;color:#0A6B64;" +
+            "white-space:nowrap;";
+
+        top.append(title, badge);
+
+        const meta =
+            document.createElement("p");
+
+        meta.textContent =
+            idea.studentName + " \u00b7 " +
+            idea.domain + " \u00b7 floated " +
+            idea.date;
+
+        meta.style.cssText =
+            "margin:6px 0 12px;font-size:13px;color:#5B7077;";
+
+        const body =
+            document.createElement("p");
+
+        body.textContent = idea.description;
+        body.style.cssText =
+            "white-space:pre-wrap;margin:0;" +
+            "font-size:14px;line-height:1.6;color:#2B444C;";
+
+        card.append(top, meta, body);
+
+        if (idea.comment) {
+
+            const note =
+                document.createElement("p");
+
+            note.textContent =
+                "Your comment: " + idea.comment;
+
+            note.style.cssText =
+                "margin:12px 0 0;font-size:13px;color:#5B7077;";
+
+            card.appendChild(note);
+        }
+
+        if (idea.status === "pending") {
+
+            const actions =
+                document.createElement("div");
+
+            actions.style.cssText =
+                "display:flex;gap:10px;margin-top:16px;";
+
+            const approve =
+                document.createElement("button");
+
+            approve.type = "button";
+            approve.className = "btn btn-primary";
+            approve.textContent = "Approve";
+            approve.addEventListener(
+                "click",
+                () => reviewIdea(idea.id, "approved")
+            );
+
+            const reject =
+                document.createElement("button");
+
+            reject.type = "button";
+            reject.className = "btn btn-danger";
+            reject.textContent = "Reject";
+            reject.addEventListener(
+                "click",
+                () => reviewIdea(idea.id, "rejected")
+            );
+
+            actions.append(approve, reject);
+            card.appendChild(actions);
+        }
+
+        list.appendChild(card);
+    });
+}
+
+
+async function reviewIdea(id, status) {
+
+    const comment =
+        prompt(
+            "Add a comment for the student (optional):",
+            ""
+        );
+
+    if (comment === null) {
+        return;
+    }
+
+    const { error } =
+        await window.supabaseClient
+            .from("project_proposals")
+            .update({
+                status,
+                review_comment: comment.trim() || null,
+                reviewed_by: facultyEmail,
+                reviewed_at: new Date().toISOString()
+            })
+            .eq("proposal_id", id);
+
+    if (error) {
+        console.error(
+            "Could not review idea:",
+            error
+        );
+
+        showToast(
+            error.code === "22P02"
+                ? "That status isn't allowed by the database."
+                : "Could not save your decision."
+        );
+
+        return;
+    }
+
+    showToast(
+        status === "approved"
+            ? "Idea approved."
+            : "Idea rejected."
+    );
+
+    renderIdeas();
 }
 
 
