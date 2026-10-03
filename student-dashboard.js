@@ -407,14 +407,37 @@ projects.forEach((project) => {
         projectDomainMap.get(project.project_code) || [];
 });
 
+// Load EVERY domain from project_domains (the Project Tags table),
+// so tags created by faculty show up here even before any project uses them.
+let allDomainNames = [];
+
+const { data: allDomainData, error: allDomainError } =
+    await window.supabaseClient
+        .from("project_domains")
+        .select("name")
+        .order("name");
+
+if (allDomainError) {
+    console.error(
+        "Could not load all domains:",
+        allDomainError
+    );
+} else {
+    allDomainNames =
+        (allDomainData || [])
+            .map((domain) => domain.name)
+            .filter(Boolean);
+}
+
 // Create Domain filter options
 DOMAINS = [
     "All",
-    ...new Set(
-        projects.flatMap(
+    ...new Set([
+        ...allDomainNames,
+        ...projects.flatMap(
             (project) => project.domains
         )
-    )
+    ])
 ];
 
 console.log(
@@ -1048,8 +1071,15 @@ function renderDiscoverChips() {
         <button class="chip" data-status="${status}" data-active="${status === activeStatus}">${status}</button>
     `).join("");
 
+    const escapeChip = (text) =>
+        String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+
     document.getElementById("domainChips").innerHTML = DOMAINS.map((domain) => `
-        <button class="chip" data-domain-filter="${domain}" data-active="${domain === activeDomain}">${domain}</button>
+        <button class="chip" data-domain-filter="${escapeChip(domain)}" data-active="${domain === activeDomain}">${escapeChip(domain)}</button>
     `).join("");
 
     const mentorSelect = document.getElementById("discoverMentorSelect");
@@ -1585,61 +1615,27 @@ function slugify(text) {
    Mentors, domains and ideas now come from Supabase.
    No placeholder data.
 ------------------------------------------------------ */
-let floatMentors = [];   // [{ email, name }]
 let floatDomains = [];   // ["AI / ML", ...]
+let floatDomainIdByName = new Map();
 let supabaseIdeas = [];  // ideas loaded from project_proposals
 
-// If your project_proposals column names differ, change them here.
+// Ideas go to the ILGC faculty, so mentor_email is left empty.
 function buildProposalRow(f) {
     return {
         title: f.title,
-        description: `Problem: ${f.problem}\n\nScope: ${f.scope}`,
-        domain: f.domain,
-        tags: f.tags,
-        student_email: userId,
-        mentor_email: f.mentorEmail,
+        description:
+            `Problem: ${f.problem}\n\nScope: ${f.scope}` +
+            (f.tags && f.tags.length ? `\n\nTags: ${f.tags.join(", ")}` : ""),
+        domain_id: floatDomainIdByName.get(f.domain) || null,
+        submitted_by: userId,
         status: "pending"
     };
-}
-
-async function loadFloatMentors() {
-    const { data: profiles, error } = await window.supabaseClient
-        .from("mentor_profiles")
-        .select("*");
-
-    if (error) {
-        console.error("Could not load mentors:", error);
-        floatMentors = [];
-        return;
-    }
-
-    const rows = (profiles || []).map((r) => ({
-        email: r.email || r.mentor_email || r.user_email || "",
-        fallbackName: r.name || r.full_name || ""
-    })).filter((r) => r.email);
-
-    let userRows = [];
-    if (rows.length > 0) {
-        const { data } = await window.supabaseClient
-            .from("users")
-            .select("email, name")
-            .in("email", rows.map((r) => r.email));
-        userRows = data || [];
-    }
-    const nameByEmail = new Map(userRows.map((u) => [u.email, u.name]));
-
-    floatMentors = rows.map((r) => ({
-        email: r.email,
-        name: nameByEmail.get(r.email) || r.fallbackName || r.email
-    })).sort((a, b) => a.name.localeCompare(b.name));
-
-    console.log("Mentors for Float an Idea:", floatMentors);
 }
 
 async function loadFloatDomains() {
     const { data, error } = await window.supabaseClient
         .from("project_domains")
-        .select("name")
+        .select("domain_id, name")
         .order("name");
 
     if (error) {
@@ -1647,23 +1643,24 @@ async function loadFloatDomains() {
         floatDomains = [];
         return;
     }
+    floatDomainIdByName = new Map((data || []).map((d) => [d.name, d.domain_id]));
     floatDomains = [...new Set((data || []).map((d) => d.name).filter(Boolean))];
 }
 
-function mapProposalRow(r, nameByEmail) {
-    const mentorEmail = r.mentor_email || r.target_mentor_email || "";
-    const studentEmail = r.student_email || r.proposed_by || r.created_by || "";
+function mapProposalRow(r, nameByEmail, domainNameById) {
+    const studentEmail = r.submitted_by || "";
     const status = String(r.status || "pending");
     return {
-        id: r.proposal_id ?? r.id ?? `${studentEmail}-${r.created_at}`,
+        id: r.proposal_id,
         title: r.title || "Untitled idea",
         studentUserId: studentEmail,
         studentName: nameByEmail.get(studentEmail) || studentEmail || "A student",
-        domain: r.domain || r.domain_name || "General",
-        targetMentor: nameByEmail.get(mentorEmail) || mentorEmail || "a mentor",
-        proposedDate: String(r.created_at || r.proposed_at || r.submitted_at || "").slice(0, 10),
+        domain: domainNameById.get(r.domain_id) || "General",
+        targetMentor: "ILGC Faculty",
+        proposedDate: String(r.created_at || "").slice(0, 10),
+        reviewedDate: String(r.reviewed_at || "").slice(0, 10),
         status: status.split(/[_\s]+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" "),
-        mentorFeedback: r.mentor_feedback || r.feedback || ""
+        mentorFeedback: r.review_comment || ""
     };
 }
 
@@ -1678,9 +1675,7 @@ async function loadStudentIdeas() {
         return;
     }
 
-    const emails = [...new Set((data || []).flatMap((r) => [
-        r.student_email, r.proposed_by, r.created_by, r.mentor_email, r.target_mentor_email
-    ]).filter(Boolean))];
+    const emails = [...new Set((data || []).map((r) => r.submitted_by).filter(Boolean))];
 
     let userRows = [];
     if (emails.length > 0) {
@@ -1690,7 +1685,11 @@ async function loadStudentIdeas() {
     }
     const nameByEmail = new Map(userRows.map((u) => [u.email, u.name]));
 
-    supabaseIdeas = (data || []).map((r) => mapProposalRow(r, nameByEmail));
+    const { data: domainRows } = await window.supabaseClient
+        .from("project_domains").select("domain_id, name");
+    const domainNameById = new Map((domainRows || []).map((d) => [d.domain_id, d.name]));
+
+    supabaseIdeas = (data || []).map((r) => mapProposalRow(r, nameByEmail, domainNameById));
     console.log("Ideas from Supabase:", supabaseIdeas);
 }
 
@@ -1704,7 +1703,7 @@ function openFloatIdeaModal() {
     modalBody.innerHTML = `
         <p class="modal-eyebrow">YOUR IDEA</p>
         <h2 class="modal-title">Float a Project Idea</h2>
-        <p class="modal-text" style="margin-bottom:18px;">Propose your own project. It'll be sent to a mentor for review and will be visible to the ILGC faculty and mentors, marked as floated by you.</p>
+        <p class="modal-text" style="margin-bottom:18px;">Propose your own project. It'll be sent to the ILGC faculty for review, marked as floated by you.</p>
 
         <form id="floatIdeaForm" class="float-form">
             <label class="float-label">Project title
@@ -1716,14 +1715,6 @@ function openFloatIdeaModal() {
                     ${floatDomains.length
                         ? floatDomains.map((d) => `<option value="${d}">${d}</option>`).join("")
                         : `<option value="General">General</option>`}
-                </select>
-            </label>
-
-            <label class="float-label">Send to mentor
-                <select id="fiMentor" required>
-                    ${floatMentors.length
-                        ? floatMentors.map((m) => `<option value="${m.email}">${m.name}</option>`).join("")
-                        : `<option value="" disabled selected>No mentors available</option>`}
                 </select>
             </label>
 
@@ -1752,17 +1743,9 @@ function openFloatIdeaModal() {
         const title = document.getElementById("fiTitle").value.trim();
         if (!title) return;
 
-        const mentorEmail = document.getElementById("fiMentor").value;
-        if (!mentorEmail) {
-            showToast("Please choose a mentor");
-            return;
-        }
-        const mentor = floatMentors.find((m) => m.email === mentorEmail);
-
         const fields = {
             title,
             domain: document.getElementById("fiDomain").value,
-            mentorEmail,
             problem: document.getElementById("fiProblem").value.trim(),
             scope: document.getElementById("fiScope").value.trim(),
             tags: document.getElementById("fiTags").value
@@ -1788,13 +1771,13 @@ function openFloatIdeaModal() {
                 proposedDate: new Date().toISOString().slice(0, 10),
                 status: "Pending",
                 tags: fields.tags,
-                targetMentor: mentor ? mentor.name : mentorEmail,
+                targetMentor: "ILGC Faculty",
                 origin: "student"
             });
             showToast("Saved locally only — check console (Supabase error)");
         } else {
             await loadStudentIdeas();
-            showToast("Idea floated ✓ — your mentor will review it");
+            showToast("Idea floated ✓ — the ILGC faculty will review it");
         }
 
         closeModal();
@@ -1856,7 +1839,7 @@ function renderMyIdeas() {
         const mine = isMyIdea(idea);
         const who = mine ? "you" : idea.studentName;
         const feedback = idea.mentorFeedback
-            ? `<p class="idea-text" style="margin-top:8px;"><strong>Mentor feedback:</strong> ${idea.mentorFeedback}</p>`
+            ? `<p class="idea-text" style="margin-top:8px;"><strong>Faculty feedback:</strong> ${idea.mentorFeedback}</p>`
             : "";
         return `
             <div class="interest-row">
@@ -1986,7 +1969,6 @@ async function initStudentDashboard() {
     await loadDiscoverProjects();
 
     await Promise.all([
-        loadFloatMentors(),
         loadFloatDomains(),
         loadStudentIdeas()
     ]);
