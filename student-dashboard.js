@@ -196,9 +196,15 @@ async function loadStudentProjects() {
         return [];
     }
 
+    const deletedCodes = await loadHiddenProjectCodes(["deleted_projects"]);
+
     const projectCodes = [
         ...new Set(memberships.map((m) => m.project_code))
-    ];
+    ].filter((code) => !deletedCodes.has(String(code)));
+
+    if (projectCodes.length === 0) {
+        return [];
+    }
 
     // 2. Get project details
     const { data: projects, error: projectsError } =
@@ -361,7 +367,7 @@ async function loadDiscoverProjects() {
     // 1. LOAD PROJECTS
     // --------------------------------------------------
 
-    const { data: projects, error: projectsError } =
+    let { data: projects, error: projectsError } =
         await window.supabaseClient
             .from("projects")
             .select(`
@@ -386,6 +392,12 @@ async function loadDiscoverProjects() {
         discoverProjects = [];
         return;
     }
+
+    // Students must not see archived or deleted projects.
+    const hiddenCodes = await loadHiddenProjectCodes();
+    projects = (projects || []).filter(
+        (project) => !hiddenCodes.has(String(project.project_code))
+    );
 
     console.log("Projects from Supabase:", projects);
 
