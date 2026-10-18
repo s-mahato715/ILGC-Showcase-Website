@@ -1945,6 +1945,7 @@ function renderReportsChips() {
 }
 
 
+
 function renderReports() {
     const container = document.getElementById("reportsTable");
     const empty = document.getElementById("reportsEmpty");
@@ -1961,7 +1962,8 @@ function renderReports() {
             );
 
             (data.files || []).forEach(file => {
-                if (!file.link) return;
+                const reportUrl = file.file_url || file.link;
+               if (!reportUrl) return;
 
                 reports.push({
                     id: file.id,
@@ -1969,10 +1971,10 @@ function renderReports() {
                     projectTitle: project?.title || data.workspace?.workspace_name || projectCode,
                     reportType: "SharePoint link",
                     title: file.title || "Untitled report",
-                    submittedBy: file.addedBy || "Student",
-                    submittedDate: file.addedAt || "",
+                    submittedBy: file.added_by || file.addedBy || "Student",
+                    submittedDate: file.added_at || file.addedAt || "",
                     status: "Submitted",
-                    link: file.link
+                    link: reportUrl
                 });
             });
         });
@@ -2057,6 +2059,7 @@ function renderReports() {
         ${rows}
     `;
 }
+
 
 
 function openReportDetailModal(reportId) {
