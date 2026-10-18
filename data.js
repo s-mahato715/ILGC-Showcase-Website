@@ -233,6 +233,28 @@ function saveProjectOverlay(overlay) {
     localStorage.setItem(PROJECT_OVERLAY_KEY, JSON.stringify(overlay));
 }
 
+// Codes of projects that were archived and/or deleted (rows in archived_projects /
+// deleted_projects). Pass ["deleted_projects"] to get only deleted ones.
+// Returns an empty set if those tables can't be read.
+async function loadHiddenProjectCodes(tables = ["deleted_projects", "archived_projects"]) {
+    const hidden = new Set();
+    for (const table of tables) {
+        try {
+            const { data, error } = await window.supabaseClient
+                .from(table)
+                .select("original_project_id");
+            if (error) {
+                console.warn(`Could not read ${table} (run project_lifecycle_migration.sql so students can read it):`, error);
+                continue;
+            }
+            (data || []).forEach((row) => hidden.add(String(row.original_project_id)));
+        } catch (e) {
+            console.warn(`Could not read ${table}:`, e);
+        }
+    }
+    return hidden;
+}
+
 let SUPABASE_PROJECTS = [];
 let SUPABASE_PROJECTS_LOADED = false;
 
@@ -334,6 +356,10 @@ async function loadProjectsFromSupabase() {
     } catch (e) {
         console.warn("population_cap not available yet:", e);
     }
+
+    // Archived / deleted projects are hidden everywhere (synced across portals).
+    const hiddenCodes = await loadHiddenProjectCodes();
+    SUPABASE_PROJECTS = SUPABASE_PROJECTS.filter((p) => !hiddenCodes.has(String(p.id)));
 
     SUPABASE_PROJECTS_LOADED = true;
 
