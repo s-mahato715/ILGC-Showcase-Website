@@ -841,6 +841,20 @@ function renderHome() {
    DELETE / RESTORE PROJECTS
 ====================================================== */
 
+// Codes of the projects this mentor is assigned to (so the Archived / Deleted
+// tabs only list their own projects, even though faculty can see everyone's).
+async function loadMyMentorProjectCodes() {
+    const { data, error } = await window.supabaseClient
+        .from("project_mentors")
+        .select("project_code")
+        .eq("mentor_email", userId);
+    if (error) {
+        console.error("Could not load my project codes:", error);
+        return new Set();
+    }
+    return new Set((data || []).map((row) => String(row.project_code)));
+}
+
 async function loadDeletedProjectRows() {
     const { data, error } = await window.supabaseClient
         .from("deleted_projects")
@@ -851,7 +865,8 @@ async function loadDeletedProjectRows() {
         deletedProjectRows = [];
         return [];
     }
-    deletedProjectRows = data || [];
+    const myCodes = await loadMyMentorProjectCodes();
+    deletedProjectRows = (data || []).filter((row) => myCodes.has(String(row.original_project_id)));
     return deletedProjectRows;
 }
 
@@ -889,6 +904,7 @@ async function deleteMentorProject(projectCode) {
     }
 
     mentorGroups = mentorGroups.filter((g) => String(g.projectCode) !== code);
+    await loadProjectsFromSupabase();
     renderGroups();
     await renderDeletedProjects();
     showToast("Project moved to Deleted Projects.");
@@ -947,6 +963,7 @@ async function restoreDeletedProject(rowId) {
     }
     const { error: removeError } = await window.supabaseClient.from("deleted_projects").delete().eq("id", rowId);
     if (removeError) { console.error(removeError); showToast("Project restored, but its deleted record could not be cleared."); return; }
+    await loadProjectsFromSupabase();
     await renderAll();
     await renderDeletedProjects();
     goToTab("groups");
@@ -967,7 +984,8 @@ async function loadArchivedProjectRows() {
         archivedProjectRows = [];
         return [];
     }
-    archivedProjectRows = data || [];
+    const myCodes = await loadMyMentorProjectCodes();
+    archivedProjectRows = (data || []).filter((row) => myCodes.has(String(row.original_project_id)));
     return archivedProjectRows;
 }
 
@@ -997,6 +1015,7 @@ async function archiveMentorProject(projectCode) {
         return;
     }
     mentorGroups = mentorGroups.filter((g) => String(g.projectCode) !== code);
+    await loadProjectsFromSupabase();
     renderGroups();
     await renderArchivedProjects();
     showToast("Project moved to Archived Projects.");
@@ -1041,6 +1060,7 @@ async function restoreArchivedProject(rowId) {
     if (restoreError) { console.error("Archive restore failed:", restoreError); showToast("Restore failed. Check projects table permissions."); return; }
     const { error: removeError } = await window.supabaseClient.from("archived_projects").delete().eq("id", rowId);
     if (removeError) { console.error(removeError); showToast("Project restored, but its archive record could not be cleared."); return; }
+    await loadProjectsFromSupabase();
     await renderAll();
     await renderArchivedProjects();
     goToTab("groups");
