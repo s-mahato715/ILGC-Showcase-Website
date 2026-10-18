@@ -1944,34 +1944,103 @@ function renderReportsChips() {
     `).join("");
 }
 
-function renderReports() {
-    const reports = getAllReports()
-        .filter((r) => reportsActiveStatus === "All" || r.status === reportsActiveStatus)
-        .sort((a, b) => new Date(b.submittedDate) - new Date(a.submittedDate));
 
+function renderReports() {
     const container = document.getElementById("reportsTable");
     const empty = document.getElementById("reportsEmpty");
 
-    if (reports.length === 0) {
+    if (!container || !empty) return;
+
+    // Build reports from the SharePoint files saved in Supabase.
+    const reports = [];
+
+    if (typeof mentorSharePointData !== "undefined") {
+        mentorSharePointData.forEach((data, projectCode) => {
+            const project = mentorGroups.find(
+                p => String(p.projectCode || p.id) === String(projectCode)
+            );
+
+            (data.files || []).forEach(file => {
+                if (!file.link) return;
+
+                reports.push({
+                    id: file.id,
+                    projectCode,
+                    projectTitle: project?.title || data.workspace?.workspace_name || projectCode,
+                    reportType: "SharePoint link",
+                    title: file.title || "Untitled report",
+                    submittedBy: file.addedBy || "Student",
+                    submittedDate: file.addedAt || "",
+                    status: "Submitted",
+                    link: file.link
+                });
+            });
+        });
+    }
+
+    const filteredReports = reports
+        .filter(report =>
+            reportsActiveStatus === "All" ||
+            report.status === reportsActiveStatus
+        )
+        .sort((a, b) =>
+            new Date(b.submittedDate || 0) -
+            new Date(a.submittedDate || 0)
+        );
+
+    if (filteredReports.length === 0) {
         container.innerHTML = "";
+        empty.textContent = reports.length === 0
+            ? "No SharePoint reports have been submitted yet."
+            : "No reports match this status.";
         empty.classList.remove("hidden");
         return;
     }
 
     empty.classList.add("hidden");
 
-    const allProjects = mentorGroups;
+    const rows = filteredReports.map(report => {
+        const date = report.submittedDate
+            ? new Date(report.submittedDate).toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric"
+            })
+            : "—";
 
-    const rows = reports.map((report) => {
-        const project = allProjects.find((p) => p.id === report.projectId);
         return `
-            <div class="report-row" data-report-open="${report.id}">
-                <span class="report-project">${project ? project.title : "—"}</span>
-                <span class="report-cell">${report.reportType}</span>
-                <span class="report-cell">${report.submittedBy}</span>
-                <span class="report-cell">${report.submittedDate}</span>
-                <span><span class="badge ${reportBadgeClass(report.status)}">${report.status}</span></span>
-                <button class="btn btn-secondary" data-report-open="${report.id}">View</button>
+            <div class="report-row">
+                <span class="report-project">
+                    ${report.projectTitle}
+                </span>
+
+                <span class="report-cell">
+                    ${report.title}
+                </span>
+
+                <span class="report-cell">
+                    ${report.submittedBy}
+                </span>
+
+                <span class="report-cell">
+                    ${date}
+                </span>
+
+                <span>
+                    <span class="badge ${reportBadgeClass(report.status)}">
+                        ${report.status}
+                    </span>
+                </span>
+
+                <span>
+                    <a
+                        class="btn btn-secondary"
+                        href="${report.link}"
+                        target="_blank"
+                        rel="noopener noreferrer">
+                        Open Report ↗
+                    </a>
+                </span>
             </div>
         `;
     }).join("");
@@ -1979,7 +2048,7 @@ function renderReports() {
     container.innerHTML = `
         <div class="report-row head">
             <span>Project</span>
-            <span>Report Type</span>
+            <span>Report Title</span>
             <span>Submitted By</span>
             <span>Date</span>
             <span>Status</span>
@@ -1988,6 +2057,7 @@ function renderReports() {
         ${rows}
     `;
 }
+
 
 function openReportDetailModal(reportId) {
     const report = getAllReports().find((r) => r.id === reportId);
