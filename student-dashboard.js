@@ -1861,11 +1861,19 @@ let supabaseIdeas = [];  // ideas loaded from project_proposals
 function buildProposalRow(f) {
     return {
         title: f.title,
+
         description:
             `Problem: ${f.problem}\n\nScope: ${f.scope}` +
-            (f.tags && f.tags.length ? `\n\nTags: ${f.tags.join(", ")}` : ""),
+            (f.tags && f.tags.length
+                ? `\n\nTags: ${f.tags.join(", ")}`
+                : ""),
+
+        potential_mentors: f.potentialMentors || null,
+
         domain_id: floatDomainIdByName.get(f.domain) || null,
+
         submitted_by: userId,
+
         status: "pending"
     };
 }
@@ -1983,10 +1991,17 @@ function openFloatIdeaModal() {
             </label>
 
             <label class="float-label">Scope
-                <textarea id="fiScope" required placeholder="What would you actually build?"></textarea>
-            </label>
+    <textarea id="fiScope" required placeholder="What would you actually build?"></textarea>
+</label>
 
-            <label class="float-label">Tags (comma-separated)
+<label class="float-label">Potential mentors
+    <textarea
+        id="fiPotentialMentors"
+        placeholder="e.g. Dr. Sandilya Garimella, Prof. XYZ"
+    ></textarea>
+</label>
+
+<label class="float-label">Tags (comma-separated)
                 <input type="text" id="fiTags" placeholder="e.g. AI, Sustainability">
             </label>
 
@@ -2004,13 +2019,16 @@ function openFloatIdeaModal() {
         if (!title) return;
 
         const fields = {
-            title,
-            domain: document.getElementById("fiDomain").value,
-            problem: document.getElementById("fiProblem").value.trim(),
-            scope: document.getElementById("fiScope").value.trim(),
-            tags: document.getElementById("fiTags").value
-                .split(",").map((t) => t.trim()).filter(Boolean)
-        };
+    title,
+    domain: document.getElementById("fiDomain").value,
+    problem: document.getElementById("fiProblem").value.trim(),
+    scope: document.getElementById("fiScope").value.trim(),
+    potentialMentors: document.getElementById("fiPotentialMentors").value.trim(),
+    tags: document.getElementById("fiTags").value
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)
+};
 
         const { error } = await window.supabaseClient
             .from("project_proposals")
