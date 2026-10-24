@@ -2440,7 +2440,9 @@ async function renderIdeas() {
             domainNameById.get(r.domain_id) || "General",
         date: String(r.created_at || "").slice(0, 10),
         status: String(r.status || "pending").toLowerCase(),
+        potentialMentors: r.potential_mentors || "",
         comment: r.review_comment || "",
+        
         reviewedBy: r.reviewed_by || ""
     }));
 
@@ -2574,6 +2576,18 @@ function drawIdeas() {
             "font-size:14px;line-height:1.6;color:#2B444C;";
 
         card.append(top, meta, body);
+        if (idea.potentialMentors) {
+    const mentors = document.createElement("p");
+
+    mentors.textContent =
+        "Potential Mentors: " + idea.potentialMentors;
+
+    mentors.style.cssText =
+        "white-space:pre-wrap;margin:12px 0 0;" +
+        "font-size:14px;line-height:1.6;color:#2B444C;";
+
+    card.appendChild(mentors);
+}
 
         if (idea.comment) {
 
