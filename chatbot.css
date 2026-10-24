@@ -1,0 +1,304 @@
+/* ======================================================
+   ILGC CHAT ASSISTANT
+   Uses the portal's existing palette (teal #007878, ink #17313A,
+   border #D7E5E3). All class names are prefixed ilgc-chat-
+   so nothing here can clash with the dashboard styles.
+   z-index 45 sits under the project modal (50) and toast (60).
+====================================================== */
+
+.ilgc-chat-launcher {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 45;
+    height: 52px;
+    padding: 0 20px 0 16px;
+    border: none;
+    border-radius: 999px;
+    background: #007878;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 10px 28px rgba(0, 80, 80, 0.28);
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.ilgc-chat-launcher:hover {
+    background: #0A5A55;
+}
+
+.ilgc-chat-launcher:focus-visible,
+.ilgc-chat-close:focus-visible,
+.ilgc-chat-send:focus-visible,
+.ilgc-chat-chip:focus-visible,
+.ilgc-chat-input:focus-visible {
+    outline: 3px solid #7CC7C2;
+    outline-offset: 2px;
+}
+
+.ilgc-chat-launcher[hidden],
+.ilgc-chat-panel[hidden] {
+    display: none;
+}
+
+/* ---------- Panel ---------- */
+
+.ilgc-chat-panel {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 45;
+    width: 380px;
+    height: min(560px, calc(100vh - 48px));
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-radius: 18px;
+    box-shadow: 0 24px 60px rgba(23, 49, 58, 0.22);
+    overflow: hidden;
+    font-family: "Open Sans", Arial, sans-serif;
+    color: #17313A;
+}
+
+.ilgc-chat-panel.ilgc-chat-open {
+    animation: ilgc-chat-rise 0.18s ease-out;
+}
+
+@keyframes ilgc-chat-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.ilgc-chat-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 14px 14px 18px;
+    background: #007878;
+    color: #ffffff;
+}
+
+.ilgc-chat-title {
+    flex: 1;
+    min-width: 0;
+}
+
+.ilgc-chat-title strong {
+    display: block;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.ilgc-chat-title span {
+    display: block;
+    font-size: 12px;
+    opacity: 0.85;
+    margin-top: 1px;
+}
+
+.ilgc-chat-close {
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.ilgc-chat-close:hover {
+    background: rgba(255, 255, 255, 0.26);
+}
+
+/* ---------- Messages ---------- */
+
+.ilgc-chat-log {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #F8FCFC;
+}
+
+.ilgc-chat-msg {
+    max-width: 88%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+}
+
+.ilgc-chat-msg p + p,
+.ilgc-chat-msg p + ul,
+.ilgc-chat-msg ul + p {
+    margin-top: 8px;
+}
+
+.ilgc-chat-msg ul {
+    padding-left: 18px;
+}
+
+.ilgc-chat-msg li + li {
+    margin-top: 3px;
+}
+
+.ilgc-chat-user {
+    align-self: flex-end;
+    background: #007878;
+    color: #ffffff;
+    border-bottom-right-radius: 4px;
+}
+
+.ilgc-chat-bot {
+    align-self: flex-start;
+    background: #ffffff;
+    border: 1px solid #D7E5E3;
+    border-bottom-left-radius: 4px;
+}
+
+.ilgc-chat-error {
+    align-self: flex-start;
+    background: #FFF4F2;
+    border: 1px solid #F1C9C2;
+    color: #8A2B1E;
+    border-bottom-left-radius: 4px;
+}
+
+.ilgc-chat-typing {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    height: 20px;
+}
+
+.ilgc-chat-typing i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #7FA9A6;
+    animation: ilgc-chat-dot 1s infinite ease-in-out;
+}
+
+.ilgc-chat-typing i:nth-child(2) { animation-delay: 0.15s; }
+.ilgc-chat-typing i:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes ilgc-chat-dot {
+    0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+    40%           { opacity: 1;   transform: translateY(-3px); }
+}
+
+/* ---------- Starter questions ---------- */
+
+.ilgc-chat-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.ilgc-chat-chip {
+    border: 1px solid #B9D6D3;
+    background: #ffffff;
+    color: #0A5A55;
+    border-radius: 999px;
+    padding: 7px 13px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+}
+
+.ilgc-chat-chip:hover {
+    background: #E9F4F3;
+}
+
+/* ---------- Composer ---------- */
+
+.ilgc-chat-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 12px;
+    border-top: 1px solid #D7E5E3;
+    background: #ffffff;
+}
+
+.ilgc-chat-input {
+    flex: 1;
+    resize: none;
+    max-height: 110px;
+    min-height: 42px;
+    padding: 10px 12px;
+    border: 1px solid #C9DAD8;
+    border-radius: 12px;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #17313A;
+    background: #ffffff;
+}
+
+.ilgc-chat-send {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 12px;
+    background: #007878;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.ilgc-chat-send:hover:not(:disabled) {
+    background: #0A5A55;
+}
+
+.ilgc-chat-send:disabled {
+    background: #A9C9C6;
+    cursor: not-allowed;
+}
+
+.ilgc-chat-note {
+    padding: 0 14px 10px;
+    font-size: 11.5px;
+    color: #5B747C;
+    background: #ffffff;
+}
+
+/* ---------- Small screens ---------- */
+
+@media (max-width: 520px) {
+    .ilgc-chat-launcher {
+        right: 16px;
+        bottom: 16px;
+    }
+
+    .ilgc-chat-panel {
+        right: 8px;
+        left: 8px;
+        bottom: 8px;
+        width: auto;
+        height: min(620px, calc(100vh - 16px));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ilgc-chat-panel.ilgc-chat-open,
+    .ilgc-chat-typing i {
+        animation: none;
+    }
+}
